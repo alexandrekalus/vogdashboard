@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h2>Bienvenue sur le Tableau de Bord</h2>
+            <p>Utilisez le menu de gauche pour naviguer entre les différentes sections :</p>
+            <ul>
+                <li><strong>Palmarès des Ventes</strong> : Affiche les performances des ventes par produit.</li>
+                <li><strong>Ajouter des Données Logistiques</strong> : Ajoutez ou mettez à jour les données logistiques pour les produits.</li>
+                <li><strong>Ventes Moyennes</strong> : Affiche les ventes mensuelles moyennes et leur évolution.</li>
+                <li><strong>Ventes par Représentant</strong> : Consultez les performances individuelles des représentants commerciaux.</li>
+                <li><strong>Ventes Mensuelles</strong> : Analysez les ventes par mois pour chaque produit ou représentant.</li>
+            </ul>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    Dernières Activités
+                </div>
+                <div class="card-body">
+                    <p>Récapitulatif des ventes récentes, mises à jour logistiques et autres activités importantes.</p>
+                    <ul>
+                        <li>Vente record sur le produit X - Janvier 2025</li>
+                        <li>Mise à jour logistique effectuée pour 5 produits</li>
+                        <li>CA moyen des représentants : 10% de hausse ce mois-ci</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    Statistiques Globales
+                </div>
+                <div class="card-body">
+                    <p>Vue d'ensemble des statistiques clés :</p>
+                    <ul>
+                        <li><strong>Total Produits Vendus</strong> : 12,345</li>
+                        <li><strong>Représentants Actifs</strong> : 25</li>
+                        <li><strong>CA Total</strong> : 1,234,567€</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

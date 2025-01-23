@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+
+{% block content %}
+ 
+    <h1>Ventes mensuelles pour le produit par représentant {{ code_article }}</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Code Client</th>
+                <th>Nom Pharmacie</th>
+                <th>Nom Représentant</th> <!-- Ajouter cette colonne -->
+                {% for column in tables[0].keys() %}
+                    {% if column not in ['code_client', 'nom_pharmacie', 'nom_representant'] %}
+                        <th>{{ column }}</th>
+                    {% endif %}
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in tables %}
+                <tr>
+                    <td>{{ row['code_client'] }}</td>
+                    <td>{{ row['nom_pharmacie'] }}</td>
+                    <td>{{ row['nom_representant'] }}</td> <!-- Afficher le nom du représentant -->
+                    {% for column, value in row.items() %}
+                        {% if column not in ['code_client', 'nom_pharmacie', 'nom_representant'] %}
+                        <td class="{{ 'has-sales' if (value|default(0)|int) > 0 else 'no-sales' }}">
+                            {{ value|default(0)|int }}
+                        </td>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>

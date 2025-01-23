@@ -1,0 +1,66 @@
+{% extends "layout.html" %}
+
+{% block content %}
+    <h1>Chiffre d'affaires par représentant</h1>
+    <table>
+        {% for rep in representative_sales %}
+        <tr>
+            <td><strong>{{ rep['nom_representant'] }}</strong></td>
+            <td>
+                <canvas id="chart-{{ loop.index }}" width="600" height="100"></canvas>
+            </td>
+        </tr>
+        <script>
+            // Données spécifiques à ce représentant
+            const labels_{{ loop.index }} = {{ average_sales.keys()|list|tojson }};
+            const salesData_{{ loop.index }} = {{ rep.values()|list|tojson }};
+            const averageSalesData_{{ loop.index }} = {{ average_sales.values()|list|tojson }};
+
+            // Créer un graphique pour ce représentant
+            const ctx_{{ loop.index }} = document.getElementById('chart-{{ loop.index }}').getContext('2d');
+            new Chart(ctx_{{ loop.index }}, {
+                type: 'bar',
+                data: {
+                    labels: labels_{{ loop.index }}, // Mois
+                    datasets: [
+                        {
+                            label: 'Chiffre d\'affaires',
+                            data: salesData_{{ loop.index }}.slice(1), // Données du représentant
+                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Moyenne des CA',
+                            data: averageSalesData_{{ loop.index }}, // Moyenne
+                            type: 'line',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 2,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        },
+                        tooltip: {
+                            enabled: true
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true
+                        },
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        </script>
+        {% endfor %}
+    </table>
+{% endblock %}

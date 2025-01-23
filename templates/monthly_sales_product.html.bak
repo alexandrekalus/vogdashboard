@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ventes mensuelles</title>
+	   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        th {
+            background-color: #f2f2f2;
+            text-align: left;
+        }
+        th a {
+            text-decoration: none;
+            color: #000;
+        }
+        .red-background {
+            background-color: #f8d7da !important;
+        }
+        .green-background {
+            background-color: #d4edda !important;
+        }
+    </style>
+</head>
+<body>
+ <div class="container mt-5">
+    <h1>Ventes mensuelles pour le produit : {{ code_article }}</h1>
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+            <th>Mois</th>
+            <th>Quantité Vendue</th>
+            <th>Quantité Reçue</th>
+            <th>Quantité Commandée</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in tables %}
+                <tr>
+                    <td>{{ row.mois }}</td>
+
+                    <td>{{ "{:.0f}".format(row.quantite_vendue ) }}</td>
+	           <td>{{ row['quantite_achetee'] }}</td>
+            <td>{{ row['quantite_commandee'] }}</td>		
+						
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <a href="/">Retour au palmarès</a>
+	</div>
+</body>
+</html>

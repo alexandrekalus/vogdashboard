@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+
+{% block content %}
+ 
+    <h1>Ventes mensuelles pour le produit : {{ code_article }}</h1>
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+            <th>Mois</th>
+            <th>Quantité Vendue</th>
+            <th>Quantité Reçue</th>
+            <th>Quantité Commandée</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in tables %}
+                <tr>
+                    <td>{{ row.mois }}</td>
+
+                    <td>{{ "{:.0f}".format(row.quantite_vendue ) }}</td>
+	           <td>{{ row['quantite_achetee'] }}</td>
+            <td>{{ row['quantite_commandee'] }}</td>		
+						
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}
