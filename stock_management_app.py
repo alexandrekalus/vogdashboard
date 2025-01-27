@@ -11,6 +11,7 @@ matplotlib.use('Agg')  # Utiliser un backend non interactif
 import matplotlib.pyplot as plt
 from app_config import app
 from routes_product_details import product_details
+
 # Initialisation de l'application Flask
 app = Flask(__name__)
 
@@ -24,6 +25,12 @@ DB_CONFIG = {
     "host": "dpg-cu9lbptsvqrc73dh3l1g-a.oregon-postgres.render.com",
     "port": "5432"
 }
+
+
+
+@app.route('/test_route')
+def test_route():
+    return "<h1>Cette route fonctionne !</h1>"
 
 from sqlalchemy import create_engine
 
