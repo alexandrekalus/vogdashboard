@@ -1,39 +1,38 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ajouter des Détails de Produit</title>
-</head>
-<body>
+{% extends "layout.html" %}
+
+{% block content %}
     <h1>Ajouter ou Modifier les Détails de Produit</h1>
-    <form action="/add_product_details" method="POST">
-        <label for="code_article">Code Article:</label><br>
-        <input type="text" id="code_article" name="code_article" value="{{ code_article }}" readonly required><br><br>
+<form method="POST" action="/add_product_details">
+    <label for="poids">Poids :</label>
+    <input type="number" step="0.01" id="poids" name="poids" 
+           value="{{ existing_data['poids'] if existing_data and 'poids' in existing_data else '' }}" required><br><br>
 
-        <label for="poids">Poids (kg):</label><br>
-        <input type="number" step="0.01" id="poids" name="poids" value="{{ existing_data.poids if existing_data else '' }}" required><br><br>
+    <label for="nb_par_carton">Nombre par carton :</label>
+    <input type="number" id="nb_par_carton" name="nb_par_carton" 
+           value="{{ existing_data['nb_par_carton'] if existing_data and 'nb_par_carton' in existing_data else '' }}" required><br><br>
 
-        <label for="nb_par_carton">Nombre par Carton:</label><br>
-        <input type="number" id="nb_par_carton" name="nb_par_carton" value="{{ existing_data.nb_par_carton if existing_data else '' }}" required><br><br>
+    <label for="largeur_carton">Largeur du carton :</label>
+    <input type="number" step="0.01" id="largeur_carton" name="largeur_carton" 
+           value="{{ existing_data['largeur_carton'] if existing_data and 'largeur_carton' in existing_data else '' }}" required><br><br>
 
-        <label for="largeur_carton">Largeur Carton (cm):</label><br>
-        <input type="number" step="0.01" id="largeur_carton" name="largeur_carton" value="{{ existing_data.largeur_carton if existing_data else '' }}" required><br><br>
+    <label for="longueur_carton">Longueur du carton :</label>
+    <input type="number" step="0.01" id="longueur_carton" name="longueur_carton" 
+           value="{{ existing_data['longueur_carton'] if existing_data and 'longueur_carton' in existing_data else '' }}" required><br><br>
 
-        <label for="longueur_carton">Longueur Carton (cm):</label><br>
-        <input type="number" step="0.01" id="longueur_carton" name="longueur_carton" value="{{ existing_data.longueur_carton if existing_data else '' }}" required><br><br>
+    <label for="hauteur_carton">Hauteur du carton :</label>
+    <input type="number" step="0.01" id="hauteur_carton" name="hauteur_carton" 
+           value="{{ existing_data['hauteur_carton'] if existing_data and 'hauteur_carton' in existing_data else '' }}" required><br><br>
 
-        <label for="hauteur_carton">Hauteur Carton (cm):</label><br>
-        <input type="number" step="0.01" id="hauteur_carton" name="hauteur_carton" value="{{ existing_data.hauteur_carton if existing_data else '' }}" required><br><br>
+    <label for="poids_carton">Poids du carton :</label>
+    <input type="number" step="0.01" id="poids_carton" name="poids_carton" 
+           value="{{ existing_data['poids_carton'] if existing_data and 'poids_carton' in existing_data else '' }}" required><br><br>
 
-        <label for="poids_carton">Poids du Carton (kg):</label><br>
-        <input type="number" step="0.01" id="poids_carton" name="poids_carton" value="{{ existing_data.poids_carton if existing_data else '' }}" required><br><br>
+    <label for="delai_reapprovisionnement">Délai de réapprovisionnement :</label>
+    <input type="number" id="delai_reapprovisionnement" name="delai_reapprovisionnement" 
+           value="{{ existing_data['delai_reapprovisionnement'] if existing_data and 'delai_reapprovisionnement' in existing_data else '' }}" required><br><br>
 
-        <label for="delai_reapprovisionnement">Délai de Réapprovisionnement (jours):</label><br>
-        <input type="number" id="delai_reapprovisionnement" name="delai_reapprovisionnement" value="{{ existing_data.delai_reapprovisionnement if existing_data else '' }}"  required><br><br>
+    <input type="hidden" name="code_article" value="{{ code_article }}">
+    <button type="submit">Enregistrer</button>
+</form>
 
-
-        <button type="submit">Ajouter ou Mettre à Jour</button>
-    </form>
-</body>
-</html>
+{% endblock %}

@@ -123,21 +123,7 @@
                                 Palmarès des Ventes
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/add_logistics">
-                                Ajouter des Données Logistiques
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/average_sales">
-                                Ventes Moyennes
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="/representative_sales">
-                                Ventes par Représentant
-                            </a>
-                        </li>
+                
                         <li class="nav-item">
                             <a class="nav-link" href="/all_representative_sales">
                                 Ventes Mensuelles par representant

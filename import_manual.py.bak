@@ -1,0 +1,50 @@
+import psycopg2
+from psycopg2 import sql
+
+# Configuration de la base de données
+DB_CONFIG = {
+    "dbname": "vogdashboard",
+    "user": "vogdashboard_user",
+    "password": "gXuIhJVeM7XqfsHe77LO0kMbInSLTOIi",
+    "host": "dpg-cu9lbptsvqrc73dh3l1g-a.oregon-postgres.render.com",
+    "port": "5432"
+}
+
+# Fonction pour insérer une ligne dans la table Ventes
+def insert_vente(code_article, date_vente, quantite_vendue, prix_achat):
+    try:
+        # Connexion à la base de données
+        conn = psycopg2.connect(**DB_CONFIG)
+        cursor = conn.cursor()
+
+        # Requête d'insertion
+        insert_query = sql.SQL("""
+            INSERT INTO Ventes (code_article, date_vente, quantite_vendue, prix_achat)
+            VALUES (%s, %s, %s, %s)
+        """)
+
+        # Exécution de la requête
+        cursor.execute(insert_query, (code_article, date_vente, quantite_vendue, prix_achat))
+        conn.commit()
+
+        print("Ligne insérée avec succès dans la table Ventes.")
+
+        # Vérification des données insérées
+        cursor.execute("SELECT * FROM Ventes ORDER BY id_vente DESC LIMIT 5;")
+        rows = cursor.fetchall()
+        print("Dernières lignes dans la table Ventes :")
+        for row in rows:
+            print(row)
+
+    except Exception as e:
+        print(f"Erreur : {e}")
+    finally:
+        # Fermeture de la connexion
+        if conn:
+            cursor.close()
+            conn.close()
+
+# Exemple d'utilisation
+if __name__ == "__main__":
+    # Exemple d'insertion
+    insert_vente("AUTOTESTSEJOY2026", "2024-08-20", 100, 0.79)

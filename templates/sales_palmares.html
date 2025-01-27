@@ -80,34 +80,35 @@
         </tr>
     </thead>
     <tbody>
-        {% for row in tables %}
+          {% for sale in sales %}
         <tr>
             <td>
-                <a href="/product/{{ row['code_article'] }}/details">{{ row.code_article }}</a>
+                <a href="/product/{{ sale['code_article'] }}/details">{{ sale['code_article'] }}</a>
             </td>
-            <td>{{ row.nom_produit }}</td>
-            <td>{{ row.quantite_stock }}</td>
+            <td>{{ sale['nom_produit'] }}</td>
+            <td>{{ sale['quantite_stock'] }}</td>
             <td class="
-                {% if row.alerte == 'Recommander' %}alert-red{% endif %}
-                {% if row.alerte == 'OK' %}alert-green{% endif %}
+                {% if sale.alerte == 'Recommander' %}alert-red{% endif %}
+                {% if sale.alerte == 'OK' %}alert-green{% endif %}
             ">
-                {{ row.alerte }}
+                {{ sale.alerte }}
             </td>
-            <td class="{% if row.vente_2025 > row.vente_2024 %}green-background{% elif row.vente_2025 < row.vente_2024 %}red-background{% endif %}">
-                {{ row.vente_2025 }}
+            <td class="{% if sale.vente_2025 > sale.vente_2024 %}green-background{% elif sale.vente_2025 < sale.vente_2024 %}red-background{% endif %}">
+                {{ sale['vente_2025'] }}
             </td>
-            <td class="{% if row.vente_2024 > row.vente_2023 %}green-background{% elif row.vente_2024 < row.vente_2023 %}red-background{% endif %}">
-                {{ row.vente_2024 }}
+            <td class="{% if sale.vente_2024 > sale.vente_2023 %}green-background{% elif sale.vente_2024 < sale.vente_2023 %}red-background{% endif %}">
+               {{ sale['vente_2024'] }}
             </td>
-            <td>{{ row.vente_2023 }}</td>
+            <td>{{ sale['vente_2023'] }}</td>
             <td>
-                <a href="/product/{{ row['code_article'] }}/monthly_sales">Voir Ventes Mensuelles par pharmacie</a><br>
-                <a href="/product/{{ row['code_article'] }}/monthly_sales_product">Voir Ventes Mensuelles</a><br>
-                <a href="/add_product_form?code_article={{ row.code_article }}">Ajouter Détails</a><br>
-                <a href="/product/{{ row.code_article }}">Voir Ventes Mensuelles par représentant</a>
+                <a href="/product/{{ sale['code_article'] }}/monthly_sales">Voir Ventes Mensuelles par pharmacie</a><br>
+                <a href="/product/{{ sale['code_article'] }}/monthly_sales_product">Voir Ventes Mensuelles</a><br>
+                <a href="/add_product_form?code_article={{ sale['code_article'] }}">Ajouter Détails</a><br>
+                <a href="/product/{{ sale['code_article'] }}">Voir Ventes Mensuelles par représentant</a>
             </td>
-        </tr>
+	</tr>
         {% endfor %}
+	
     </tbody>
 </table>
 
