@@ -83,7 +83,7 @@
           {% for sale in sales %}
         <tr>
             <td>
-                <a href="/detail_produit/{{ sale['code_article'] }}">{{ sale['code_article'] }}</a>
+                <a href="/detailproduit/{{ sale['code_article'] }}">{{ sale['code_article'] }}</a>
             </td>
             <td>{{ sale['nom_produit'] }}</td>
             <td>{{ sale['quantite_stock'] }}</td>

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+gunicorn stock_management_app:app
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import execute_values, RealDictCursor
@@ -66,7 +66,7 @@ def test_db():
             query = "SELECT * FROM ventes LIMIT 5;"
             df = pd.read_sql_query(query, engine)
             return df.to_html()
-        except Exception as e:
+        except Exception as e: 
             return f"Erreur lors de l'exécution de la requête : {e}"
     else:
         return "Impossible de se connecter à la base de données."
