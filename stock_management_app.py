@@ -66,7 +66,7 @@ def test_db():
             query = "SELECT * FROM ventes LIMIT 5;"
             df = pd.read_sql_query(query, engine)
             return df.to_html()
-        except Exception as e:
+        except Exception as e: 
             return f"Erreur lors de l'exécution de la requête : {e}"
     else:
         return "Impossible de se connecter à la base de données."
@@ -285,77 +285,71 @@ def import_product_data():
         
 
 # Fonction pour importer les données des ventes
+# Fonction pour importer les données des ventes
 def import_sales_data():
-    """Importe les données depuis ventes.xlsx dans la table Ventes."""
-    # Charger le fichier Excel
-    file_ventes = './data/ventes.xlsx'
-    try:
-        data_ventes = pd.read_excel(file_ventes)
-        print("Colonnes disponibles dans le fichier ventes.xlsx :", data_ventes.columns)
+    file_sales = './data/ventes.xlsx'
+    if not os.path.exists(file_sales):
+        print("Fichier ventes.xlsx introuvable dans le dossier ./data. Vérifiez le chemin et réessayez.")
+        return
 
-        # Nettoyage et sélection des colonnes nécessaires
-        data_ventes = data_ventes.rename(columns={
+    try:
+        # Charger le fichier Excel
+        data_sales = pd.read_excel(file_sales)
+        print("Colonnes disponibles dans le fichier ventes :")
+        print(data_sales.columns)
+
+        # Renommer les colonnes pour correspondre à la base de données
+        data_sales.rename(columns={
             'Date': 'date_vente',
+            'Num pièce': 'num_piece',
+            'Code client': 'code_client',
             'Code Article': 'code_article',
             'Quantite': 'quantite_vendue',
             'Prix achat': 'prix_achat'
-        })
-        data_ventes = data_ventes[['code_article', 'date_vente', 'quantite_vendue', 'prix_achat']]
+        }, inplace=True)
 
-        # Nettoyage des données
-        data_ventes['quantite_vendue'] = pd.to_numeric(data_ventes['quantite_vendue'], errors='coerce').fillna(0).astype(int)
-        data_ventes['prix_achat'] = pd.to_numeric(data_ventes['prix_achat'], errors='coerce').fillna(0).astype(float)
-
-        # Convertir les dates en format natif Python
-        data_ventes['date_vente'] = pd.to_datetime(data_ventes['date_vente'], errors='coerce').dt.date
-        data_ventes = data_ventes.dropna(subset=['date_vente'])  # Supprimer les lignes avec des dates invalides
-
-        # Conversion explicite des types pour éviter les erreurs avec psycopg2
-        data_ventes = data_ventes.astype({
-            'quantite_vendue': int,
-            'prix_achat': float
-        })
-
-        # Aperçu des données nettoyées
-        print("Données prêtes pour insertion :")
-        print(data_ventes.head())
-
-        # Connexion à la base de données
-        conn = get_db_connection()
-        if not conn:
-            print("Impossible de se connecter à la base de données.")
+        # Conserver uniquement les colonnes nécessaires
+        expected_columns = ['date_vente', 'num_piece', 'code_client', 'code_article', 'quantite_vendue', 'prix_achat']
+        if not all(col in data_sales.columns for col in expected_columns):
+            missing_columns = [col for col in expected_columns if col not in data_sales.columns]
+            print(f"Colonnes manquantes dans le fichier Excel : {missing_columns}")
             return
 
-        # Insertion des données
-        with conn.cursor() as cursor:
-            # Préparer les données pour insertion
-            rows = data_ventes.to_dict(orient='records')
-            values = [(row['code_article'], row['date_vente'], row['quantite_vendue'], row['prix_achat']) for row in rows]
+        data_sales = data_sales[expected_columns]
 
-            # Requête d'insertion
-            insert_query = """
-                INSERT INTO "Ventes" (code_article, date_vente, quantite_vendue, prix_achat)
-                VALUES %s;
-            """
-            execute_values(cursor, insert_query, values)
+        # Conversion des dates
+        data_sales['date_vente'] = pd.to_datetime(data_sales['date_vente'], errors='coerce')
 
-        # Valider la transaction
-        conn.commit()
-        print("Données insérées avec succès dans la table Ventes.")
+        # Supprimer les lignes avec des dates invalides ou des valeurs manquantes dans les colonnes clés
+        data_sales = data_sales.dropna(subset=['date_vente', 'code_client', 'code_article', 'quantite_vendue', 'prix_achat'])
 
-        # Vérification des données insérées
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM Ventes LIMIT 5;")
-            results = cursor.fetchall()
-            print("Données insérées (premières lignes) :")
-            for row in results:
-                print(row)
+        # Remplacer les valeurs non valides par des zéros (si nécessaire, ajustez cette logique selon vos besoins)
+        data_sales['quantite_vendue'] = pd.to_numeric(data_sales['quantite_vendue'], errors='coerce').fillna(0).astype(int)
+        data_sales['prix_achat'] = pd.to_numeric(data_sales['prix_achat'], errors='coerce').fillna(0.0).astype(float)
 
-        # Fermer la connexion
-        conn.close()
+        # Connexion à la base PostgreSQL via SQLAlchemy
+        engine = create_engine(DATABASE_URL)
+
+        # Vérifier que les clients existent dans la table client
+        query = "SELECT code_client FROM client"
+        existing_clients = pd.read_sql_query(query, engine)['code_client'].tolist()
+
+        # Filtrer les ventes pour ne conserver que celles avec des clients existants
+        data_sales = data_sales[data_sales['code_client'].isin(existing_clients)]
+        if data_sales.empty:
+            print("Aucune donnée valide à insérer dans la table Ventes.")
+            return
+
+        # Afficher un aperçu des données prêtes pour insertion
+        print("Données prêtes pour insertion :")
+        print(data_sales.head())
+
+        # Insérer les données dans PostgreSQL
+        data_sales.to_sql('Ventes', con=engine, if_exists='append', index=False, method='multi')
+        print("Données ventes importées avec succès.")
 
     except Exception as e:
-        print(f"Erreur lors de l'importation des ventes : {e}")
+        print(f"Erreur lors de l'importation des données ventes : {e}")
 
 
 

@@ -6,7 +6,7 @@ DATABASE_URL = "postgresql://vogdashboard_user:gXuIhJVeM7XqfsHe77LO0kMbInSLTOIi@
 engine = create_engine(DATABASE_URL)
 
 def product_details(app):
-    @app.route('/product/<code_article>/details')
+    @app.route('/detailproduit/<code_article>')
     def product_details_route(code_article):
         try:
             with engine.connect() as conn:

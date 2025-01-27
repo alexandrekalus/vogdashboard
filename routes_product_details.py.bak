@@ -5,9 +5,8 @@ from sqlalchemy import create_engine, text
 DATABASE_URL = "postgresql://vogdashboard_user:gXuIhJVeM7XqfsHe77LO0kMbInSLTOIi@dpg-cu9lbptsvqrc73dh3l1g-a.oregon-postgres.render.com/vogdashboard"
 engine = create_engine(DATABASE_URL)
 
-
 def product_details(app):
-    @app.route('/product/<code_article>/details')
+    @app.route('/detail-produit/<code_article>')
     def product_details_route(code_article):
         try:
             with engine.connect() as conn:
@@ -91,12 +90,14 @@ def product_details(app):
                 """)
                 stocks_mensuels = conn.execute(query_stock_monthly_data, {"code_article": code_article}).fetchall()
 
-                mois_labels = sorted({row[0] for row in ventes_mensuelles} | {row[0] for row in stocks_mensuels})
-                ventes_dict = {row[0]: row[1] for row in ventes_mensuelles}
-                stocks_dict = {row[0]: row[1] for row in stocks_mensuels}
+                # Structurer les données pour le graphique en filtrant les dates invalides
+                mois_labels = sorted({row[0] for row in ventes_mensuelles if row[0]} | {row[0] for row in stocks_mensuels if row[0]})
+                ventes_dict = {row[0]: row[1] for row in ventes_mensuelles if row[0]}
+                stocks_dict = {row[0]: row[1] for row in stocks_mensuels if row[0]}
                 data_ventes = [ventes_dict.get(mois, 0) for mois in mois_labels]
                 data_stocks = [stocks_dict.get(mois, 0) for mois in mois_labels]
 
+                # Rendre la page HTML
                 return render_template('product_details.html',
                                        product={
                                            'code_article': product_details[0],
