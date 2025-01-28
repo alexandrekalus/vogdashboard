@@ -28,11 +28,6 @@ DB_CONFIG = {
 }
 
 
-
-@app.route('/test_route')
-def test_route():
-    return "<h1>Cette route fonctionne !</h1>"
-
 from sqlalchemy import create_engine
 
 # Remplacez get_db_connection par l'utilisation d'un moteur SQLAlchemy
