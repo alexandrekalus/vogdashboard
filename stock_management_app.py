@@ -909,7 +909,10 @@ def palmares():
     order_by = request.args.get('order_by', 'vente_2024 DESC')
     palmares_data = get_palmares(order_by)
     return render_template('palmares.html', tables=palmares_data.to_dict(orient='records'), order_by=order_by)    
-    
+
+@app.route('/test')
+def test_route():
+    return "La route de test fonctionne !"    
 
 if __name__ == '__main__':
     create_tables()
