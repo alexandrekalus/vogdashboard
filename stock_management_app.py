@@ -1056,7 +1056,92 @@ def product_details_route(code_article):
                                    })
     except Exception as e:
         print(f"Erreur lors de la récupération des détails du produit : {e}")
-        return f"Erreur lors de la récupération des détails du produit : {e}", 500     
+        return f"Erreur lors de la récupération des détails du produit : {e}", 500  
+
+
+
+@app.route('/')
+def dashboard():
+    engine = create_engine(DATABASE_URL)  # Utilise SQLAlchemy pour la connexion
+    try:
+        with engine.connect() as conn:
+            # 1. Chiffre d'affaires global du mois
+            ca_mois = conn.execute(text("""
+                SELECT 
+                    COALESCE(SUM(quantite_vendue * prix_achat), 0) AS ca_mois
+                FROM "Ventes"
+                WHERE DATE_TRUNC('month', date_vente) = DATE_TRUNC('month', CURRENT_DATE);
+            """)).scalar() or 0
+
+            # 2. Évolution du chiffre d'affaires
+            evolution_data = conn.execute(text("""
+                WITH ca_courant AS (
+                    SELECT 
+                        COALESCE(SUM(quantite_vendue * prix_achat), 0) AS ca_mois_courant
+                    FROM "Ventes"
+                    WHERE DATE_TRUNC('month', date_vente) = DATE_TRUNC('month', CURRENT_DATE)
+                ),
+                ca_annee_precedente AS (
+                    SELECT 
+                        COALESCE(SUM(quantite_vendue * prix_achat), 0) AS ca_mois_precedent
+                    FROM "Ventes"
+                    WHERE DATE_TRUNC('month', date_vente) = DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 year'
+                )
+                SELECT 
+                    CAST(ROUND(ca_courant.ca_mois_courant) AS INTEGER) AS ca_mois_courant,
+                    CAST(ROUND(ca_annee_precedente.ca_mois_precedent) AS INTEGER) AS ca_mois_precedent,
+                    CAST(ROUND(
+                        ((ca_courant.ca_mois_courant - ca_annee_precedente.ca_mois_precedent) 
+                        / NULLIF(ca_annee_precedente.ca_mois_precedent, 0)) * 100
+                    ) AS INTEGER) AS evolution
+                FROM ca_courant, ca_annee_precedente;
+            """)).fetchone()
+
+            ca_mois_courant = evolution_data[0] or 0
+            ca_mois_precedent = evolution_data[1] or 0
+            evolution = evolution_data[2] or 0
+
+            # 3. Top 10 des produits les plus vendus
+            top_products = conn.execute(text("""
+                SELECT 
+                    v.code_article,
+                    p.nom_produit,
+                    SUM(v.quantite_vendue) AS quantite_totale,
+                    CAST(SUM(v.quantite_vendue * v.prix_achat) AS INTEGER) AS chiffre_affaire
+                FROM "Ventes" v
+                JOIN produits p ON v.code_article = p.code_article
+                WHERE DATE_TRUNC('month', v.date_vente) = DATE_TRUNC('month', CURRENT_DATE)
+                GROUP BY v.code_article, p.nom_produit
+                ORDER BY quantite_totale DESC
+                LIMIT 10;
+            """)).fetchall()
+
+            # 4. Top 5 des représentants ayant fait le plus de chiffre
+            top_representatives = conn.execute(text("""
+                SELECT 
+                    c.representant AS nom_representant,
+                    CAST(SUM(v.quantite_vendue * v.prix_achat) AS INTEGER) AS chiffre_affaire
+                FROM "Ventes" v
+                JOIN client c ON v.code_client = c.code_client
+                WHERE DATE_TRUNC('month', v.date_vente) = DATE_TRUNC('month', CURRENT_DATE)
+                GROUP BY c.representant
+                ORDER BY chiffre_affaire DESC
+                LIMIT 5;
+            """)).fetchall()
+
+        # Retourne les données pour affichage
+        return render_template(
+            'dashboard.html', 
+            ca_mois=ca_mois_courant,
+            evolution=evolution,
+            top_products=top_products,
+            top_representatives=top_representatives
+        )
+    except Exception as e:
+        return f"Erreur lors du chargement du tableau de bord : {e}", 500
+
+
+        
 
 
 @app.route("/import_clients")
@@ -1084,9 +1169,6 @@ def import_purchases():
     import_purchase_data()
     return "Importation des données achats terminée."
 
-@app.route("/")
-def index():
-    return render_template("dashboard.html")
     
 # Route principale pour afficher le palmarès
 @app.route('/')

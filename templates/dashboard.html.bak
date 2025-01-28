@@ -41,14 +41,14 @@
                     <ul>
                         <li><strong>Chiffre d'affaires mois en cours : </strong> : {{ ca_mois }}€</li>
                         <li><strong>Évolution par rapport à l'année dernière : </strong> : {{ evolution }}%</li>
-                        <li><strong>Top 10 Produits</strong></li>
+                        <li>Top 10 Produits</li>
 							<ul>
 								{% for product in top_products %}
 									<li>{{ product.nom_produit }} : {{ product.quantite_totale }} unités vendues</li>
 								{% endfor %}
 							</ul>
 
-							<li><strong>Top 5 Représentants</strong></lo>
+							<li>Top 5 Représentants</lo>
 							<ul>
 								{% for rep in top_representatives %}
 									<li>{{ rep.nom_representant }} : {{ rep.chiffre_affaire }}€</li>
