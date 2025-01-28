@@ -8,9 +8,6 @@ engine = create_engine(DATABASE_URL)
 
 
 def product_details(app):
-    @app.route('/test_route/<param>')
-    def test_route(param):
-        return f"Test Route Param: {param}"
     @app.route('/essailienpourvoir/<code_article>')
     def product_details_route(code_article):
         print(f"Route appelée avec code_article: {code_article}")

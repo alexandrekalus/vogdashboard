@@ -10,6 +10,8 @@ import matplotlib
 matplotlib.use('Agg')  # Utiliser un backend non interactif
 import matplotlib.pyplot as plt
 from app_config import app
+import folium
+import geopandas as gpd
 
 
 # Initialisation de l'application Flask
@@ -85,7 +87,7 @@ def list_tables():
             print(f"Erreur lors de la récupération des tables : {e}")
 
 
-# espace pour rajouter au fur et à mesure
+# on efface les donnees des tables avant ajout des fichiers excel
 
 def truncate_table(table_name, engine):
     """
@@ -231,6 +233,9 @@ def import_stock_data():
 
         # Connexion à la base PostgreSQL via SQLAlchemy
         engine = create_engine(DATABASE_URL)
+
+        # Vider la table stocks avant l'importation
+        truncate_table('stocks', engine)
 
         # Récupérer la liste des `code_article` existants dans la table produits
         query = "SELECT code_article FROM produits;"
@@ -1139,6 +1144,78 @@ def dashboard():
         )
     except Exception as e:
         return f"Erreur lors du chargement du tableau de bord : {e}", 500
+        
+
+
+
+# Chargement de la correspondance code département -> nom département
+department_mapping = pd.read_csv("./data/departements.csv")  # Fichier contenant les colonnes "code" et "nom"
+
+@app.route('/carte_ventes_agents')
+def carte_ventes_agents():
+    engine = create_engine(DATABASE_URL)  # Utilise SQLAlchemy pour la connexion
+    try:
+        # Étape 1 : Récupérer les données des ventes et agents par département
+        query = text("""
+            SELECT
+                LEFT(c.cp::TEXT, 2) AS code_departement,
+                COUNT(DISTINCT c.code_client) AS nb_clients,
+                STRING_AGG(DISTINCT c.representant, ', ') AS nom_agents
+            FROM client c
+            JOIN "Ventes" v ON c.code_client = v.code_client
+            GROUP BY LEFT(c.cp::TEXT, 2)
+        """)
+        data = pd.read_sql_query(query, engine)
+
+        # Vérifier que des données ont été récupérées
+        if data.empty:
+            return "<h1>Aucune donnée disponible pour la carte des ventes.</h1>"
+
+        # Étape 2 : Charger les données géographiques des départements
+        france_departments = gpd.read_file("https://france-geojson.gregoiredavid.fr/repo/departements.geojson")
+
+        # Étape 3 : Fusionner les données des départements avec les données clients et agents
+        data.rename(columns={"code_departement": "code"}, inplace=True)  # Adapter les noms pour la fusion
+        map_data = france_departments.merge(data, on="code", how="left")
+
+        # Étape 4 : Créer une carte interactive avec Folium
+        m = folium.Map(location=[46.603354, 1.888334], zoom_start=6)
+
+        # Ajouter un choropleth pour le nombre de clients par département
+        folium.Choropleth(
+            geo_data=map_data,
+            name="choropleth",
+            data=map_data,
+            columns=["code", "nb_clients"],
+            key_on="feature.properties.code",
+            fill_color="YlGn",
+            fill_opacity=0.7,
+            line_opacity=0.2,
+            legend_name="Nombre de clients par département"
+        ).add_to(m)
+
+        # Ajouter des popups avec des informations supplémentaires pour chaque département
+        for _, row in map_data.iterrows():
+            if pd.notna(row["geometry"]) and pd.notna(row["nb_clients"]):  # Vérifie que la géométrie est présente
+                popup_content = f"""
+                <b>Département :</b> {row['nom']}<br>
+                <b>Agents :</b> {row['nom_agents'] or 'Aucun'}<br>
+                <b>Clients :</b> {row['nb_clients'] or 0}
+                """
+                geojson = folium.GeoJson(row["geometry"])
+                geojson.add_child(folium.Popup(popup_content, max_width=300))
+                geojson.add_to(m)
+
+        # Étape 5 : Sauvegarder la carte dans un fichier HTML
+        m.save("templates/carte_ventes_agents.html")
+
+        return render_template("carte_ventes_agents.html")
+
+    except Exception as e:
+        return f"Erreur lors de la génération de la carte : {e}", 500
+
+
+
 
 
         
