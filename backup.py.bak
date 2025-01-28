@@ -929,16 +929,28 @@ def representative_sales(nom_representant):
     products_data = get_products_by_representative(nom_representant) 
     return render_template('representative_sales.html', tables=products_data.to_dict(orient='records'), nom_representant=nom_representant)
     
- # Route pour afficher les ventes mensuelles par pharmacie pour un produit
+# Route pour afficher les ventes mensuelles par pharmacie pour un produit
 @app.route('/product/<code_article>/monthly_sales')
 def monthly_sales(code_article):
+    # Obtenir les ventes mensuelles par pharmacie
     monthly_sales_data = get_monthly_sales_by_pharmacy(code_article)
-    return render_template('monthly_sales.html', tables=monthly_sales_data.to_dict(orient='records'), code_article=code_article)
- 
-# Fonction pour obtenir les ventes mensuelles par pharmacie pour un produit spécifique
 
+    # Si aucune donnée n'est retournée, afficher un message approprié
+    if monthly_sales_data is None or monthly_sales_data.empty:
+        return f"<h1>Aucune donnée de vente disponible pour le produit : {code_article}</h1>"
+
+    # Rendu de la page HTML avec les données
+    return render_template(
+        'monthly_sales.html',
+        tables=monthly_sales_data.to_dict(orient='records'),
+        code_article=code_article
+    )
+
+
+# Fonction pour obtenir les ventes mensuelles par pharmacie pour un produit spécifique
 def get_monthly_sales_by_pharmacy(code_article):
-    conn = get_db_connection()
+    # Créer une connexion avec SQLAlchemy
+    engine = create_engine(DATABASE_URL)
     query = '''
     SELECT
         c.code_client AS code_client,
@@ -947,9 +959,9 @@ def get_monthly_sales_by_pharmacy(code_article):
         TO_CHAR(v.date_vente, 'YYYY-MM') AS mois,
         SUM(v.quantite_vendue * v.prix_achat) AS chiffre_affaire
     FROM
-        Ventes v
+        "Ventes" v
     JOIN
-        Client c ON v.code_client = c.code_client
+        client c ON v.code_client = c.code_client
     WHERE
         v.code_article = %s
     GROUP BY
@@ -958,7 +970,13 @@ def get_monthly_sales_by_pharmacy(code_article):
         c.nom_client, mois;
     '''
     try:
-        sales_data = pd.read_sql_query(query, conn, params=[code_article])
+        # Exécution de la requête avec Pandas
+        sales_data = pd.read_sql_query(query, engine, params=[code_article])
+
+        # Vérification si les données sont vides
+        if sales_data.empty:
+            print(f"Aucune vente trouvée pour le produit : {code_article}")
+            return None
 
         # Transformation en table pivot
         sales_pivot = sales_data.pivot_table(
@@ -970,12 +988,17 @@ def get_monthly_sales_by_pharmacy(code_article):
 
         print(f"Ventes mensuelles par pharmacie pour le produit {code_article} :")
         print(sales_pivot)
+
         return sales_pivot
+
     except Exception as e:
         print(f"Erreur lors de la récupération des ventes mensuelles par pharmacie : {e}")
         return None
+
     finally:
-        conn.close()
+        # Libération des ressources
+        engine.dispose()
+
 
     
 
