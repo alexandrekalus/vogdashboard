@@ -6,8 +6,9 @@ DATABASE_URL = "postgresql://vogdashboard_user:gXuIhJVeM7XqfsHe77LO0kMbInSLTOIi@
 engine = create_engine(DATABASE_URL)
 
 def product_details(app):
-    @app.route('/detailproduit/<code_article>')
+    @app.route('/essailienpourvoir/<code_article>')
     def product_details_route(code_article):
+    print(f"Route appelée avec code_article: {code_article}")
         try:
             with engine.connect() as conn:
                 # Récupérer les détails du produit
@@ -122,3 +123,4 @@ def product_details(app):
                                        })
         except Exception as e:
             return f"Erreur lors de la récupération des détails du produit : {e}", 500
+            print("Route /essailienpourvoir/<code_article> enregistrée")

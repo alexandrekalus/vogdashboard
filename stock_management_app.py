@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from app_config import app
 from routes_product_details import product_details
 
+
 # Initialisation de l'application Flask
 app = Flask(__name__)
 
@@ -915,4 +916,5 @@ if __name__ == '__main__':
     create_product_table()
     product_details(app)
     app.run(debug=True)
+    app.config['DEBUG'] = True
 

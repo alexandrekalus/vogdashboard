@@ -8,6 +8,7 @@ engine = create_engine(DATABASE_URL)
 def product_details(app):
     @app.route('/essailienpourvoir/<code_article>')
     def product_details_route(code_article):
+        print(f"Route appelée avec code_article: {code_article}")
         try:
             with engine.connect() as conn:
                 # Récupérer les détails du produit
@@ -121,4 +122,5 @@ def product_details(app):
                                            'stocks': data_stocks
                                        })
         except Exception as e:
+            print(f"Erreur lors de la récupération des détails du produit : {e}")
             return f"Erreur lors de la récupération des détails du produit : {e}", 500
