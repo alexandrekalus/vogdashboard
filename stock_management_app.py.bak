@@ -86,6 +86,20 @@ def list_tables():
 
 
 # espace pour rajouter au fur et à mesure
+
+def truncate_table(table_name, engine):
+    """
+    Vide une table spécifique dans la base de données en forçant le commit.
+    """
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(f'TRUNCATE TABLE "{table_name}" RESTART IDENTITY CASCADE;'))
+            conn.commit()  # Force la validation de la transaction
+            print(f"La table {table_name} a été vidée avec succès.")
+    except Exception as e:
+        print(f"Erreur lors du vidage de la table {table_name} : {e}")
+
+
 # en crée les bases de données
 def create_tables():
     conn = get_db_connection()
@@ -182,6 +196,10 @@ def import_client_data():
 
         # Connexion à PostgreSQL via SQLAlchemy
         engine = create_engine(DATABASE_URL)
+        
+        # Vider la table avant importation
+        truncate_table('client')
+        
         if engine:
             # Insérer les données dans la table client
             data_clients.to_sql('client', con=engine, if_exists='append', index=False, method='multi')
@@ -332,6 +350,21 @@ def import_sales_data():
         # Connexion à la base PostgreSQL via SQLAlchemy
         engine = create_engine(DATABASE_URL)
 
+        # Vider la table avant importation
+        try:
+            truncate_table('Ventes', engine)
+        except Exception as e:
+            print(f"Erreur lors du vidage de la table Ventes : {e}")
+            return
+        
+         # Vérification si la table est bien vidée
+        with engine.connect() as conn:
+            result = conn.execute(text('SELECT COUNT(*) FROM "Ventes";'))
+            count = result.scalar()
+            print(f"Nombre de lignes dans la table Ventes après vidage : {count}")
+            if count != 0:
+                print("La table Ventes n'a pas été vidée correctement. Vérifiez la commande TRUNCATE.")
+        
         # Vérifier que les clients existent dans la table client
         query = "SELECT code_client FROM client"
         existing_clients = pd.read_sql_query(query, engine)['code_client'].tolist()
@@ -346,8 +379,11 @@ def import_sales_data():
         print("Données prêtes pour insertion :")
         print(data_sales.head())
 
+   
         # Insérer les données dans PostgreSQL
-        data_sales.to_sql('Ventes', con=engine, if_exists='append', index=False, method='multi')
+        with engine.begin() as conn:  # Utilisation explicite d'une transaction
+            data_sales.to_sql('Ventes', con=conn, if_exists='append', index=False, method='multi')
+
         print("Données ventes importées avec succès.")
 
     except Exception as e:
@@ -466,6 +502,8 @@ def sales_palmares():
 #fonction pour la recherche
 @app.route('/search')
 def search():
+    # Utilisez un moteur SQLAlchemy pour la connexion
+    engine = create_engine(DATABASE_URL)
     query = request.args.get('q', '').strip().lower()  # Nettoyer et convertir la requête en minuscule
     if not query:
         return jsonify([])  # Retourne une liste vide si aucun mot-clé n'est fourni

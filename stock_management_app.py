@@ -86,6 +86,20 @@ def list_tables():
 
 
 # espace pour rajouter au fur et à mesure
+
+def truncate_table(table_name, engine):
+    """
+    Vide une table spécifique dans la base de données en forçant le commit.
+    """
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(f'TRUNCATE TABLE "{table_name}" RESTART IDENTITY CASCADE;'))
+            conn.commit()  # Force la validation de la transaction
+            print(f"La table {table_name} a été vidée avec succès.")
+    except Exception as e:
+        print(f"Erreur lors du vidage de la table {table_name} : {e}")
+
+
 # en crée les bases de données
 def create_tables():
     conn = get_db_connection()
@@ -182,6 +196,10 @@ def import_client_data():
 
         # Connexion à PostgreSQL via SQLAlchemy
         engine = create_engine(DATABASE_URL)
+        
+        # Vider la table avant importation
+        truncate_table('client')
+        
         if engine:
             # Insérer les données dans la table client
             data_clients.to_sql('client', con=engine, if_exists='append', index=False, method='multi')
@@ -325,12 +343,28 @@ def import_sales_data():
         # Supprimer les lignes avec des dates invalides ou des valeurs manquantes dans les colonnes clés
         data_sales = data_sales.dropna(subset=['date_vente', 'code_client', 'code_article', 'quantite_vendue', 'prix_achat'])
 
-        # Remplacer les valeurs non valides par des zéros (si nécessaire, ajustez cette logique selon vos besoins)
+        # Remplacer les valeurs non valides par des zéros
         data_sales['quantite_vendue'] = pd.to_numeric(data_sales['quantite_vendue'], errors='coerce').fillna(0).astype(int)
         data_sales['prix_achat'] = pd.to_numeric(data_sales['prix_achat'], errors='coerce').fillna(0.0).astype(float)
 
         # Connexion à la base PostgreSQL via SQLAlchemy
         engine = create_engine(DATABASE_URL)
+
+        # Vider la table avant importation
+        try:
+            truncate_table('Ventes', engine)
+        except Exception as e:
+            print(f"Erreur lors du vidage de la table Ventes : {e}")
+            return
+
+        # Vérifier si la table est bien vidée
+        with engine.connect() as conn:
+            result = conn.execute(text('SELECT COUNT(*) FROM "Ventes";'))
+            count = result.scalar()
+            print(f"Nombre de lignes dans la table Ventes après vidage : {count}")
+            if count != 0:
+                print("La table Ventes n'a pas été vidée correctement. Vérifiez la commande TRUNCATE.")
+                return
 
         # Vérifier que les clients existent dans la table client
         query = "SELECT code_client FROM client"
@@ -347,12 +381,19 @@ def import_sales_data():
         print(data_sales.head())
 
         # Insérer les données dans PostgreSQL
-        data_sales.to_sql('Ventes', con=engine, if_exists='append', index=False, method='multi')
+        with engine.begin() as conn:
+            data_sales.to_sql('Ventes', con=conn, if_exists='append', index=False, method='multi')
+
+        # Vérification post-insertion
+        with engine.connect() as conn:
+            result = conn.execute(text('SELECT COUNT(*) FROM "Ventes";'))
+            count_after = result.scalar()
+            print(f"Nombre de lignes dans la table Ventes après insertion : {count_after}")
+
         print("Données ventes importées avec succès.")
 
     except Exception as e:
         print(f"Erreur lors de l'importation des données ventes : {e}")
-
 
 
 
