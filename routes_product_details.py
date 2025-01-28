@@ -11,6 +11,8 @@ def product_details(app):
     @app.route('/essailienpourvoir/<code_article>')
     def product_details_route(code_article):
         print(f"Route appelée avec code_article: {code_article}")
+        return f"Page pour le produit : {code_article}"
+        print("Route /essailienpourvoir/<code_article> enregistrée")
         try:
             with engine.connect() as conn:
                 # Récupérer les détails du produit
