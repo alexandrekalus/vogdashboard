@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from app_config import app
 import folium
 import geopandas as gpd
+import json  # Import du module json
 
 
 # Initialisation de l'application Flask
@@ -192,7 +193,10 @@ def import_client_data():
             'PAYS': 'pays'
         }, inplace=True)
 
-        # Vérifier les colonnes après renommage
+        # Ajouter un zéro aux codes postaux à 4 chiffres
+        data_clients['cp'] = data_clients['cp'].apply(lambda x: str(x).zfill(5) if pd.notnull(x) else x)
+
+        # Vérifier les colonnes après modification
         print("Données prêtes pour insertion :")
         print(data_clients.head())
 
@@ -200,16 +204,20 @@ def import_client_data():
         engine = create_engine(DATABASE_URL)
         
         # Vider la table avant importation
-        truncate_table('client')
+        with engine.begin() as connection:
+            connection.execute(text("TRUNCATE TABLE client RESTART IDENTITY CASCADE;"))
+            print("Table client vidée avec succès.")
         
+        # Insérer les données dans la table client
         if engine:
-            # Insérer les données dans la table client
             data_clients.to_sql('client', con=engine, if_exists='append', index=False, method='multi')
             print("Données clients importées avec succès.")
         else:
             print("Erreur : impossible de créer un moteur SQLAlchemy.")
     except Exception as e:
         print(f"Erreur lors de l'importation des données clients : {e}")
+
+
 
 
 # Fonction pour importer les données des stocks
@@ -1147,15 +1155,16 @@ def dashboard():
         
 
 
-
-# Chargement de la correspondance code département -> nom département
-department_mapping = pd.read_csv("./data/departements.csv")  # Fichier contenant les colonnes "code" et "nom"
-
+# gestion de la carte des representants
 @app.route('/carte_ventes_agents')
 def carte_ventes_agents():
-    engine = create_engine(DATABASE_URL)  # Utilise SQLAlchemy pour la connexion
+    engine = create_engine(DATABASE_URL)
     try:
-        # Étape 1 : Récupérer les données des ventes et agents par département
+        # Charger le fichier departements.csv
+        department_mapping = pd.read_csv("./data/departements.csv")
+        department_mapping["code"] = department_mapping["code"].astype(str).str.zfill(2)
+
+        # Récupérer les données des ventes et agents
         query = text("""
             SELECT
                 LEFT(c.cp::TEXT, 2) AS code_departement,
@@ -1163,56 +1172,81 @@ def carte_ventes_agents():
                 STRING_AGG(DISTINCT c.representant, ', ') AS nom_agents
             FROM client c
             JOIN "Ventes" v ON c.code_client = v.code_client
+            WHERE v.date_vente >= '2024-01-01' AND v.date_vente < '2025-01-01'
             GROUP BY LEFT(c.cp::TEXT, 2)
         """)
         data = pd.read_sql_query(query, engine)
+        data["code_departement"] = data["code_departement"].astype(str).str.zfill(2)
 
-        # Vérifier que des données ont été récupérées
-        if data.empty:
-            return "<h1>Aucune donnée disponible pour la carte des ventes.</h1>"
-
-        # Étape 2 : Charger les données géographiques des départements
+        # Charger les données géographiques
         france_departments = gpd.read_file("https://france-geojson.gregoiredavid.fr/repo/departements.geojson")
+        france_departments["code"] = france_departments["code"].astype(str).str.zfill(2)
 
-        # Étape 3 : Fusionner les données des départements avec les données clients et agents
-        data.rename(columns={"code_departement": "code"}, inplace=True)  # Adapter les noms pour la fusion
+        # Fusionner les données
+        data.rename(columns={"code_departement": "code"}, inplace=True)
         map_data = france_departments.merge(data, on="code", how="left")
+        map_data = map_data.merge(department_mapping, on="code", how="left")
+        map_data["nom"] = map_data["nom_x"].combine_first(map_data["nom_y"])
+        map_data.drop(columns=["nom_x", "nom_y"], inplace=True)
 
-        # Étape 4 : Créer une carte interactive avec Folium
-        m = folium.Map(location=[46.603354, 1.888334], zoom_start=6)
+        # Calculer le ratio
+        map_data["ratio_clients_pharmacies"] = (
+            map_data["nb_clients"] / map_data["nb_pharmacies"]
+        ).fillna(0).round(2)
 
-        # Ajouter un choropleth pour le nombre de clients par département
-        folium.Choropleth(
-            geo_data=map_data,
-            name="choropleth",
-            data=map_data,
-            columns=["code", "nb_clients"],
-            key_on="feature.properties.code",
-            fill_color="YlGn",
-            fill_opacity=0.7,
-            line_opacity=0.2,
-            legend_name="Nombre de clients par département"
-        ).add_to(m)
+        # Convertir les géométries en GeoJSON
+        map_data["geometry"] = map_data["geometry"].apply(lambda geom: geom.__geo_interface__ if geom else None)
 
-        # Ajouter des popups avec des informations supplémentaires pour chaque département
-        for _, row in map_data.iterrows():
-            if pd.notna(row["geometry"]) and pd.notna(row["nb_clients"]):  # Vérifie que la géométrie est présente
-                popup_content = f"""
-                <b>Département :</b> {row['nom']}<br>
-                <b>Agents :</b> {row['nom_agents'] or 'Aucun'}<br>
-                <b>Clients :</b> {row['nb_clients'] or 0}
-                """
-                geojson = folium.GeoJson(row["geometry"])
-                geojson.add_child(folium.Popup(popup_content, max_width=300))
-                geojson.add_to(m)
+        # Générer les données à transmettre au template
+        department_data = map_data[[
+            "code", "nom", "geometry", "nb_clients", "nom_agents", "nb_pharmacies", "ratio_clients_pharmacies"
+        ]].to_dict(orient="records")
+        department_data = map_data.apply(
+            lambda row: {
+                "type": "Feature",
+                "properties": {
+                    "code": row["code"],
+                    "nom": row["nom"],
+                    "nb_clients": row["nb_clients"] or 0,
+                    "nom_agents": row["nom_agents"] or "Aucun",
+                    "nb_pharmacies": row["nb_pharmacies"] or 0,
+                    "ratio_clients_pharmacies": row["ratio_clients_pharmacies"] or 0
+                },
+                "geometry": row["geometry"]
+            },
+            axis=1
+        ).tolist()
 
-        # Étape 5 : Sauvegarder la carte dans un fichier HTML
-        m.save("templates/carte_ventes_agents.html")
 
-        return render_template("carte_ventes_agents.html")
+        # Ajouter ce print ici pour afficher un aperçu des données générées
+        print("Exemple de department_data :", json.dumps(department_data[:2], indent=2))
+
+        agent_data = (
+            data.explode("nom_agents")
+            .groupby("nom_agents")
+            .agg({"code": lambda x: list(x)})
+            .reset_index()
+        )
+        agent_data.rename(columns={"nom_agents": "nom", "code": "departments"}, inplace=True)
+        agent_data = agent_data.to_dict(orient="records")
+
+        # Vérification des données
+        if not department_data:
+            raise ValueError("Les données des départements sont vides ou mal formatées.")
+        if not agent_data:
+            raise ValueError("Les données des agents sont vides ou mal formatées.")
+
+        # Passer les données au template
+        return render_template(
+            "carte_ventes_agents.html",
+            department_data=json.dumps(department_data),  # Sérialisation en JSON
+            agent_data=json.dumps(agent_data),            # Sérialisation en JSON
+        )
 
     except Exception as e:
+        print(f"Erreur lors de la génération des données : {e}")
         return f"Erreur lors de la génération de la carte : {e}", 500
+
 
 
 

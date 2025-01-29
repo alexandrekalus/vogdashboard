@@ -35,13 +35,6 @@ departments_data = {
         "Haute-Vienne", "Vosges", "Yonne", "Territoire de Belfort",
         "Essonne", "Hauts-de-Seine", "Seine-Saint-Denis", "Val-de-Marne", "Val-d'Oise",
         "Guadeloupe", "Martinique", "Guyane", "La Réunion", "Mayotte"
-    ],
-    "nb_pharmacies": [
-        185, 189, 144, 75, 68, 577, 108, 126, 54, 116, 165, 119, 990, 251, 77, 144, 264, 119, 109, 191,
-        218, 61, 155, 191, 178, 163, 130, 320, 290, 460, 75, 641, 487, 320, 95, 214, 418, 100, 152, 108,
-        257, 86, 441, 206, 74, 134, 38, 255, 151, 211, 72, 94, 304, 69, 265, 341, 89, 1073, 258, 109, 584,
-        244, 287, 99, 211, 345, 231, 630, 90, 227, 168, 166, 256, 1267, 394, 433, 492, 146, 219, 139, 87,
-        469, 254, 232, 159, 171, 136, 139, 55, 412, 612, 491, 484, 412, None, None, None, None, None
     ]
 }
 
@@ -49,5 +42,5 @@ departments_data = {
 departments_df = pd.DataFrame(departments_data)
 
 # Sauvegarder dans un fichier CSV
-departments_df.to_csv("departements.csv", index=False, encoding="utf-8")
+departments_df.to_csv("departements.csv", index=False)
 print("Fichier departements.csv généré avec succès.")

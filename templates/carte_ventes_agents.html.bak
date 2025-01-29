@@ -36,10 +36,9 @@
             background-color: #0056b3;
             color: white;
         }
-		#content_carte {display:flex;}
     </style>
 
-<div id="content_carte">
+
 <div id="map"></div>
 <div id="agent-listing">
     <h3>Agents actifs (2024)</h3>
@@ -47,7 +46,7 @@
         <!-- La liste des agents sera insérée ici -->
     </ul>
 </div>
-</div>
+
 <script>
     const map = L.map('map').setView([46.603354, 1.888334], 6);
 
