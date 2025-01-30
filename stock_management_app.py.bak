@@ -15,6 +15,7 @@ import geopandas as gpd
 import json  # Import du module json
 import seaborn as sns
 from datetime import datetime, timedelta
+import traceback
 
 # Initialisation de l'application Flask
 app = Flask(__name__)
@@ -303,53 +304,93 @@ def import_stock_data():
 
 # Fonction pour importer les données des produits
 
+    
+        
 def import_product_data():
     file_products = './data/produits.xlsx'
+    
+    # Vérifier si le fichier existe
     if not os.path.exists(file_products):
-        print("Fichier produits.xlsx introuvable dans le dossier ./data. Vérifiez le chemin et réessayez.")
+        print("Fichier produits.xlsx introuvable dans le dossier ./data.")
         return "Fichier produits.xlsx introuvable.", 404
 
     try:
         # Charger les données du fichier Excel
         data_products = pd.read_excel(file_products)
-        print("Colonnes disponibles dans le fichier produits :")
-        print(data_products.columns)
+        print("Colonnes disponibles dans le fichier produits :", data_products.columns.tolist())
 
-        # Renommer les colonnes
+        # Renommer les colonnes pour correspondre à la base de données
         data_products.rename(columns={
             'Code Article': 'code_article',
             'Nom produit': 'nom_produit',
-            'Ean': 'ean'
+            'Ean': 'ean',
+            'Delai_livraison': 'delai_livraison'  # Utilise le nom exact de la colonne
         }, inplace=True)
 
         # Sélectionner uniquement les colonnes nécessaires
-        data_products = data_products[['code_article', 'nom_produit', 'ean']]
+        data_products = data_products[['code_article', 'nom_produit', 'ean', 'delai_livraison']]
 
         # Convertir 'ean' en chaîne de caractères pour éviter la notation scientifique
-        data_products['ean'] = data_products['ean'].apply(lambda x: f"{int(x):013d}" if not pd.isna(x) else None)
+        data_products['ean'] = data_products['ean'].apply(lambda x: f"{int(x):013d}" if pd.notna(x) else None)
 
         # Afficher un aperçu des données avant l'insertion
-        print("Données prêtes pour insertion :")
-        print(data_products.head())
+        print("Données prêtes pour insertion :\n", data_products.head())
 
-        # Connexion directe avec psycopg2 pour exécuter TRUNCATE
-        conn = psycopg2.connect(**DB_CONFIG)
-        cursor = conn.cursor()
-        cursor.execute("TRUNCATE TABLE produits RESTART IDENTITY CASCADE;")
-        conn.commit()
-        cursor.close()
-        conn.close()
+        # Connexion à PostgreSQL avec psycopg2 pour vider la table produits
+        try:
+            with psycopg2.connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    # Vider la table produits
+                    cursor.execute("TRUNCATE TABLE produits RESTART IDENTITY CASCADE;")
+                    conn.commit()
+                    print("Table produits vidée avec succès.")
 
-        # Charger les données dans PostgreSQL via SQLAlchemy
-        engine = create_engine(DATABASE_URL)
-        data_products.to_sql('produits', con=engine, if_exists='append', index=False, method='multi')
+                    # Charger les données dans la table produits
+                    engine = create_engine(DATABASE_URL)
+                    data_products[['code_article', 'nom_produit', 'ean']].to_sql(
+                        'produits', con=engine, if_exists='append', index=False, method='multi')
+                    print("Données produits importées avec succès.")
 
-        print("Données produits importées avec succès.")
-        return "Données produits importées avec succès.", 200
+                    # Gérer les données dans la table logistiqueproduits
+                    for index, row in data_products.iterrows():
+                        code_article = row['code_article']
+                        delai_livraison = row['delai_livraison']
+
+                        # Vérifier si le code_article existe déjà
+                        cursor.execute(
+                            "SELECT COUNT(*) FROM logistiqueproduits WHERE code_article = %s;", (code_article,))
+                        exists = cursor.fetchone()[0]
+
+                        if exists:
+                            # Mise à jour du délai de réapprovisionnement
+                            cursor.execute(
+                                "UPDATE logistiqueproduits "
+                                "SET delai_reapprovisionnement = %s "
+                                "WHERE code_article = %s;",
+                                (delai_livraison, code_article)
+                            )
+                            print(f"Produit {code_article} mis à jour dans logistiqueproduits.")
+                        else:
+                            # Insertion d'une nouvelle ligne
+                            cursor.execute(
+                                "INSERT INTO logistiqueproduits (code_article, delai_reapprovisionnement) "
+                                "VALUES (%s, %s);",
+                                (code_article, delai_livraison)
+                            )
+                            print(f"Produit {code_article} inséré dans logistiqueproduits.")
+
+                        conn.commit()
+
+            return "Données produits et logistique importées avec succès.", 200
+        except Exception as e:
+            print("Erreur lors de l'insertion des données :", e)
+            print(traceback.format_exc())  # Affichage complet de l'erreur
+            return f"Erreur lors de l'insertion des données : {e}", 500
 
     except Exception as e:
-        print(f"Erreur lors de l'importation des données produits : {e}")
-        return f"Erreur lors de l'importation des données produits : {e}", 500
+        print("Erreur lors de l'importation :", e)
+        print(traceback.format_exc())  # Affichage complet de l'erreur
+        return f"Erreur lors de l'importation : {e}", 500       
         
 
 # Fonction pour importer les données des ventes
@@ -445,69 +486,116 @@ def import_sales_data():
 
 
 
-
-
-# Fonction pour importer les données des achats
+# Fonction pour importer les données des achats après avoir vidé la table
 def import_purchase_data():
-
     file_purchases = './data/achats.xlsx'
+    
     if not os.path.exists(file_purchases):
-        print("Fichier achats.xlsx introuvable dans le dossier ./data. Vérifiez le chemin et réessayez.")
-        return
+        print("Fichier achats.xlsx introuvable dans le dossier ./data.")
+        return "Fichier achats.xlsx introuvable.", 404
 
     try:
         # Charger le fichier Excel
         data_purchases = pd.read_excel(file_purchases)
-        print("Colonnes disponibles dans le fichier achats :")
-        print(data_purchases.columns)
+        print("Colonnes initiales :", data_purchases.columns.tolist())
+
+        # Supprimer explicitement la colonne 'rien' si elle existe
+        if 'rien' in data_purchases.columns:
+            data_purchases.drop(columns=['rien'], inplace=True)
+            print("Colonne 'rien' supprimée.")
+        
+        print("Colonnes disponibles après suppression :", data_purchases.columns.tolist())
 
         # Renommer les colonnes pour correspondre à la base de données
-        data_purchases.rename(columns={
+        expected_columns = {
             'code_document': 'code_document',
             'numero_document': 'numero_document',
             'date_document': 'date_document',
             'fournisseur': 'fournisseur',
             'quantite': 'quantite',
             'code_article': 'code_article'
-        }, inplace=True)
+        }
+
+        # Vérifier si toutes les colonnes attendues sont présentes
+        missing_columns = [col for col in expected_columns.keys() if col not in data_purchases.columns]
+        if missing_columns:
+            print(f"Erreur : Colonnes manquantes dans le fichier Excel : {missing_columns}")
+            return f"Colonnes manquantes : {missing_columns}", 400
+
+        # Renommer uniquement les colonnes existantes
+        data_purchases.rename(columns=expected_columns, inplace=True)
 
         # Conserver uniquement les colonnes nécessaires
-        expected_columns = ['code_document', 'numero_document', 'date_document', 'fournisseur', 'quantite', 'code_article']
-        data_purchases = data_purchases[expected_columns]
+        data_purchases = data_purchases[list(expected_columns.values())]
+        print("Données après renommage et sélection des colonnes :")
+        print(data_purchases.head())
 
-        # Conversion des dates au format JJMMAA
-        def convert_date(date_str):
-            try:
-                return pd.to_datetime(date_str, format='%d%m%y').strftime('%Y-%m-%d')
-            except ValueError:
-                return None
+        # Vérifier et convertir les dates si nécessaire
+        if pd.api.types.is_datetime64_any_dtype(data_purchases['date_document']):
+            print("Les dates sont déjà au format datetime.")
+            # Si les dates sont déjà des objets datetime, les convertir au format attendu
+            data_purchases['date_document'] = data_purchases['date_document'].dt.strftime('%Y-%m-%d')
+        else:
+            print("Conversion des dates depuis un format texte.")
+            def convert_date(date_str):
+                try:
+                    return pd.to_datetime(date_str, format='%d/%m/%Y').strftime('%Y-%m-%d')
+                except ValueError:
+                    try:
+                        # Si le format initial échoue, tenter avec 2 chiffres pour l'année
+                        return pd.to_datetime(date_str, format='%d/%m/%y').strftime('%Y-%m-%d')
+                    except ValueError:
+                        return None
+            data_purchases['date_document'] = data_purchases['date_document'].astype(str).apply(convert_date)
 
-        data_purchases['date_document'] = data_purchases['date_document'].astype(str).apply(convert_date)
+        print("Données après conversion des dates :")
+        print(data_purchases.head())
 
         # Supprimer les lignes avec des dates invalides ou des valeurs manquantes
-        data_purchases = data_purchases.dropna(subset=['date_document', 'code_article'])
+        data_purchases.dropna(subset=['date_document', 'code_article'], inplace=True)
+        print("Données après suppression des lignes avec des valeurs manquantes :")
+        print(data_purchases.head())
+
+        # Connexion PostgreSQL pour vider la table "achats"
+        try:
+            with psycopg2.connect(**DB_CONFIG) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("TRUNCATE TABLE achats RESTART IDENTITY CASCADE;")
+                    conn.commit()
+                    print("Table achats vidée avec succès.")
+        except Exception as e:
+            print(f"Erreur lors du TRUNCATE de la table achats : {e}")
+            return f"Erreur lors du TRUNCATE : {e}", 500
 
         # Récupérer les articles existants dans la table produits
         engine = create_engine(DATABASE_URL)
         query = "SELECT code_article FROM produits"
         existing_articles = pd.read_sql_query(query, engine)['code_article'].tolist()
+        print(f"Articles existants récupérés : {len(existing_articles)} articles")
 
         # Filtrer les achats pour ne conserver que ceux avec des articles existants
         data_purchases = data_purchases[data_purchases['code_article'].isin(existing_articles)]
-        if data_purchases.empty:
-            print("Aucune donnée valide à insérer dans la table achats.")
-            return
-
-        # Afficher un aperçu des données prêtes pour insertion
-        print("Données prêtes pour insertion :")
+        print("Données après filtrage des articles existants :")
         print(data_purchases.head())
 
-        # Insérer les données dans PostgreSQL
-        data_purchases.to_sql('achats', con=engine, if_exists='append', index=False, method='multi')
-        print("Données achats importées avec succès.")
-    except Exception as e:
-        print(f"Erreur lors de l'importation des données achats : {e}")
+        if data_purchases.empty:
+            print("Aucune donnée valide à insérer dans la table achats.")
+            return "Aucune donnée valide à insérer.", 204
 
+        # Insérer les données dans PostgreSQL
+        try:
+            data_purchases.to_sql('achats', con=engine, if_exists='append', index=False, method='multi')
+            print("Données achats importées avec succès.")
+            return "Données achats importées avec succès.", 200
+        except Exception as e:
+            print("Erreur lors de l'insertion des données achats :", e)
+            print(traceback.format_exc())  # Affichage complet de l'erreur
+            return f"Erreur lors de l'insertion des données achats : {e}", 500
+
+    except Exception as e:
+        print("Erreur lors de l'importation des achats :", e)
+        print(traceback.format_exc())  # Affichage complet de l'erreur
+        return f"Erreur lors de l'importation : {e}", 500
 
 
 @app.route("/sales_palmares")
@@ -515,12 +603,15 @@ def sales_palmares():
     # Utilisation du moteur SQLAlchemy pour la connexion
     engine = create_engine(DATABASE_URL)
     try:
-        # Requête pour obtenir le palmarès des ventes (seulement les factures)
+        # Requête SQL corrigée
         query = text('''
         SELECT 
             p.code_article AS code_article,
             p.nom_produit,
             COALESCE(s.quantite_stock, 0) AS quantite_stock,
+            lp.delai_reapprovisionnement,
+            COALESCE(ROUND((SUM(CASE WHEN v.date_vente >= CURRENT_DATE - INTERVAL '30 days' 
+                AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) / 30.0)::numeric, 2), 0) AS ventes_moy_30_jours,
             SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2023 AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) AS vente_2023,
             SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2024 AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) AS vente_2024,
             SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2025 AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) AS vente_2025
@@ -529,9 +620,11 @@ def sales_palmares():
         LEFT JOIN 
             stocks s ON p.code_article = s.code_article
         LEFT JOIN 
+            logistiqueproduits lp ON p.code_article = lp.code_article
+        LEFT JOIN 
             "Ventes" v ON p.code_article = v.code_article
         GROUP BY 
-            p.code_article, p.nom_produit, s.quantite_stock
+            p.code_article, p.nom_produit, s.quantite_stock, lp.delai_reapprovisionnement
         ORDER BY 
             vente_2024 DESC;
         ''')
@@ -543,12 +636,34 @@ def sales_palmares():
         if df.empty:
             return "<h1>Aucune donnée disponible pour le palmarès des ventes.</h1>"
 
-        # Affichage des résultats dans la console pour debug
-        print("Données récupérées pour le palmarès des ventes :")
-        print(df.head())
+        # Ajouter la colonne "Alerte" avec les détails des calculs
+        def calculate_alert(row):
+            # Extraire les valeurs nécessaires
+            delai = row['delai_reapprovisionnement'] if pd.notnull(row['delai_reapprovisionnement']) else 0
+            ventes_moy_30 = row['ventes_moy_30_jours'] if pd.notnull(row['ventes_moy_30_jours']) else 0
+            stock_actuel = row['quantite_stock'] if pd.notnull(row['quantite_stock']) else 0
 
-        # Convertir les données en HTML pour affichage
-        return render_template("sales_palmares.html", sales=df.to_dict(orient="records"))
+            # Calculs
+            stock_securite = ventes_moy_30 * 5
+            seuil_reapprovisionnement = ventes_moy_30 * delai
+
+            # Alerte
+            if stock_actuel < (stock_securite + seuil_reapprovisionnement):
+                alerte = "Recommander"
+            else:
+                alerte = "OK"
+
+            # Retourner les détails complets
+            return f"{alerte} | Stock Sécurité: {stock_securite:.2f}, Seuil Réapprovisionnement: {seuil_reapprovisionnement:.2f}"
+
+        # Appliquer la fonction sur chaque ligne
+        df['alerte'] = df.apply(calculate_alert, axis=1)
+
+        # Convertir les données en dict pour affichage
+        sales_data = df.to_dict(orient="records")
+
+        # Renvoyer les données au template HTML
+        return render_template("sales_palmares.html", sales=sales_data)
 
     except Exception as e:
         print(f"Erreur lors de l'exécution de la requête : {e}")
@@ -557,6 +672,8 @@ def sales_palmares():
     finally:
         # Fermez correctement la connexion à la base de données
         engine.dispose()
+
+
         
 #fonction pour la recherche
 @app.route('/search')
@@ -1321,17 +1438,13 @@ def carte_ventes_agents():
 
 from datetime import datetime, timedelta
 
-
-from datetime import datetime, timedelta
-
 @app.route('/backorders')
 def backorders():
     engine = create_engine(DATABASE_URL)
     try:
-        # Calcul de la date limite pour filtrer les commandes de plus de 3 mois
-        three_months_ago = datetime.today() - timedelta(days=90)
-        # Calcul de la date limite pour l'affichage des commandes de moins de 3 jours
-        three_days_ago = datetime.today() - timedelta(days=3)
+        # Calcul des bornes de date
+        three_months_ago = datetime.today() - timedelta(days=90)  # Limite max : 3 mois
+        three_days_ago = datetime.today() - timedelta(days=3)      # Limite min : 3 jours
 
         query = text("""
             SELECT 
@@ -1345,12 +1458,15 @@ def backorders():
             JOIN produits p ON v.code_article = p.code_article
             JOIN client c ON v.code_client = c.code_client
             WHERE v.num_piece LIKE 'CO%' -- Ne garder que les bons de commande
-            AND v.date_vente >= :date_limite -- Filtrer les commandes de moins de 3 mois
+            AND v.date_vente BETWEEN :date_limite_min AND :date_limite_max -- Filtrer entre 3 jours et 3 mois
             ORDER BY p.code_article, v.date_vente DESC
         """)
 
         with engine.connect() as connection:
-            result = connection.execute(query, {"date_limite": three_months_ago})
+            result = connection.execute(query, {
+                "date_limite_min": three_months_ago,
+                "date_limite_max": three_days_ago
+            })
             backorders_data = result.fetchall()
         
         # Transformer les résultats en dictionnaire regroupé par code_article
@@ -1365,21 +1481,13 @@ def backorders():
                 }
             backorders_dict[code_article]["quantite_totale"] += int(row[4])  # Conversion en entier
 
-            # Convertir la date en datetime pour assurer une bonne comparaison
-            date_commande = row[5]
-            if isinstance(date_commande, datetime):  # Si c'est déjà un datetime
-                date_obj = date_commande
-            else:  # Si c'est un objet date, on le transforme en datetime
-                date_obj = datetime.combine(date_commande, datetime.min.time())
-
-            # Ne stocker que les commandes de moins de 3 jours pour l'affichage
-            if date_obj >= three_days_ago:
-                backorders_dict[code_article]["commandes"].append({
-                    "bon_de_commande": row[2],
-                    "pharmacie": row[3],
-                    "quantite_commande": int(row[4]),  # Conversion en entier
-                    "date_commande": row[5]
-                })
+            # Ajouter les commandes filtrées à la liste
+            backorders_dict[code_article]["commandes"].append({
+                "bon_de_commande": row[2],
+                "pharmacie": row[3],
+                "quantite_commande": int(row[4]),  # Conversion en entier
+                "date_commande": row[5]
+            })
 
         return render_template("backorders.html", backorders=backorders_dict)
 

@@ -8,7 +8,18 @@
     <div id="search-results"></div>
 
     </div>
-
+<style>
+    .alert-red {
+        background-color: #f8d7da;
+        color: #721c24;
+        font-weight: bold;
+    }
+    .alert-green {
+        background-color: #d4edda;
+        color: #155724;
+        font-weight: bold;
+    }
+</style>
 <script>
     const searchInput = document.getElementById('search');
     const resultsDiv = document.getElementById('search-results');
@@ -32,7 +43,7 @@
                             const productDiv = document.createElement('div');
                             productDiv.innerText = `${product.nom_produit} (${product.code_article})`;
                             productDiv.addEventListener('click', () => {
-                                window.location.href = `/product/${product.code_article}/details`;
+                                window.location.href = `/afficheproduit/${product.code_article}`;
                             });
                             resultsDiv.appendChild(productDiv);
                         });
@@ -87,12 +98,9 @@
             </td>
             <td>{{ sale['nom_produit'] }}</td>
             <td>{{ sale['quantite_stock'] }}</td>
-            <td class="
-                {% if sale.alerte == 'Recommander' %}alert-red{% endif %}
-                {% if sale.alerte == 'OK' %}alert-green{% endif %}
-            ">
-                {{ sale.alerte }}
-            </td>
+			<td class="{% if sale['alerte'] == 'Recommander' %}alert-red{% elif sale['alerte'] == 'OK' %}alert-green{% endif %}">
+				{{ sale['alerte'] }}
+			</td>
             <td class="{% if sale.vente_2025 > sale.vente_2024 %}green-background{% elif sale.vente_2025 < sale.vente_2024 %}red-background{% endif %}">
                 {{ sale['vente_2025'] }}
             </td>
