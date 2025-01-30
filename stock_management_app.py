@@ -13,7 +13,7 @@ from app_config import app
 import folium
 import geopandas as gpd
 import json  # Import du module json
-
+import seaborn as sns
 
 # Initialisation de l'application Flask
 app = Flask(__name__)
@@ -167,6 +167,34 @@ def create_product_table():
             conn.close()
 
 
+def group_similar_agents():
+    """Regroupe les agents ayant des noms similaires dans la base de données"""
+    engine = create_engine(DATABASE_URL)
+    similar_agents = {
+        'PASCALE BERNARD': ['PASCALE BERNARD', 'PASCALE BERNARD 2'],
+        'CHARLOTTE PERES': ['PERES', 'PERES 2'],
+        'DAVID ATTIAS': ['DAVID', 'DAVID2'],
+        'CHRISTELLE VIAUD': ['CHRISTELLE VIAUD', 'CHRISTELLE VIAUD 2'],
+        'VERONIQUE CHUPIN': ['CHUPIN', 'CHUPIN VERONIQUE', 'CHUPIN PAUL LOUP'],
+        'CHRISTINE JAHN': ['CHRISTINE JAHN', 'CHRISTINE JAHN 2'],
+        'ISABELLE BIRE': ['ISABELLE BIRE', 'ISABELLE BIRE 2']
+    }
+
+    with engine.connect() as connection:
+        for canonical_name, variations in similar_agents.items():
+            placeholders = ', '.join([f"'{name.strip()}'" for name in variations])
+            query = text(f"""
+                UPDATE client
+                SET representant = :canonical_name
+                WHERE TRIM(representant) IN ({placeholders});
+            """)
+            connection.execute(query, {'canonical_name': canonical_name})
+        
+        # Valider les modifications
+        connection.commit()
+        print("Regroupement des agents terminé.")
+
+
 def import_client_data():
     file_clients = './data/client.xlsx'
     if not os.path.exists(file_clients):
@@ -194,7 +222,7 @@ def import_client_data():
         }, inplace=True)
 
         # Ajouter un zéro aux codes postaux à 4 chiffres
-        data_clients['cp'] = data_clients['cp'].apply(lambda x: str(x).zfill(5) if pd.notnull(x) else x)
+        data_clients['cp'] = data_clients['cp'].apply(lambda x: str(int(x)).zfill(5) if pd.notnull(x) else x)
 
         # Vérifier les colonnes après modification
         print("Données prêtes pour insertion :")
@@ -214,8 +242,14 @@ def import_client_data():
             print("Données clients importées avec succès.")
         else:
             print("Erreur : impossible de créer un moteur SQLAlchemy.")
+
     except Exception as e:
         print(f"Erreur lors de l'importation des données clients : {e}")
+        return  # Arrêter l'exécution si une erreur survient
+
+    # Exécuter le regroupement des agents après l'importation
+    group_similar_agents()
+
 
 
 
@@ -477,18 +511,18 @@ def import_purchase_data():
 
 @app.route("/sales_palmares")
 def sales_palmares():
-    # Utilisez un moteur SQLAlchemy pour la connexion
+    # Utilisation du moteur SQLAlchemy pour la connexion
     engine = create_engine(DATABASE_URL)
     try:
-        # Requête pour obtenir le palmarès des ventes
-        query = '''
+        # Requête pour obtenir le palmarès des ventes (seulement les factures)
+        query = text('''
         SELECT 
             p.code_article AS code_article,
             p.nom_produit,
             COALESCE(s.quantite_stock, 0) AS quantite_stock,
-            SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2023 THEN v.quantite_vendue ELSE 0 END) AS vente_2023,
-            SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2024 THEN v.quantite_vendue ELSE 0 END) AS vente_2024,
-            SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2025 THEN v.quantite_vendue ELSE 0 END) AS vente_2025
+            SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2023 AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) AS vente_2023,
+            SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2024 AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) AS vente_2024,
+            SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2025 AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) AS vente_2025
         FROM 
             produits p
         LEFT JOIN 
@@ -499,22 +533,28 @@ def sales_palmares():
             p.code_article, p.nom_produit, s.quantite_stock
         ORDER BY 
             vente_2024 DESC;
-        '''
-        # Utilisez pandas pour exécuter la requête
+        ''')
+
+        # Exécuter la requête avec pandas
         df = pd.read_sql_query(query, engine)
 
-        # Vérifiez s'il y a des données
+        # Vérification si la requête a retourné des résultats
         if df.empty:
             return "<h1>Aucune donnée disponible pour le palmarès des ventes.</h1>"
+
+        # Affichage des résultats dans la console pour debug
+        print("Données récupérées pour le palmarès des ventes :")
+        print(df.head())
 
         # Convertir les données en HTML pour affichage
         return render_template("sales_palmares.html", sales=df.to_dict(orient="records"))
 
     except Exception as e:
+        print(f"Erreur lors de l'exécution de la requête : {e}")
         return f"Erreur lors de l'exécution de la requête : {e}"
 
     finally:
-        # Fermez le moteur SQLAlchemy correctement
+        # Fermez correctement la connexion à la base de données
         engine.dispose()
         
 #fonction pour la recherche
@@ -605,10 +645,10 @@ def dynamic_representative_sales():
 
 # Fonction pour obtenir les ventes mensuelles par représentant et le CA moyen
 def get_monthly_sales_and_average():
-    engine = get_db_connection()
+    engine = create_engine(DATABASE_URL)
 
     try:
-        # Étape 1 : Requête SQL pour obtenir les ventes mensuelles par représentant
+        # Étape 1 : Requête SQL pour obtenir les ventes mensuelles par représentant (uniquement les factures)
         query = '''
         SELECT
             c.representant AS nom_representant,
@@ -618,15 +658,18 @@ def get_monthly_sales_and_average():
             "Ventes" v
         JOIN
             client c ON v.code_client = c.code_client
+        WHERE
+            v.num_piece LIKE 'FA%'  -- Filtrer uniquement les factures
         GROUP BY
             c.representant, TO_CHAR(v.date_vente, 'YYYY-MM')
         ORDER BY
             c.representant, mois;
         '''
-        sales_data = pd.read_sql_query(query, engine)
+        sales_data = pd.read_sql_query(text(query), engine)
 
         # Vérifier s'il y a des données
         if sales_data.empty:
+            print("Aucune donnée disponible pour les ventes.")
             return None, None
 
         # Étape 2 : Calcul du chiffre d'affaires moyen par mois
@@ -639,10 +682,37 @@ def get_monthly_sales_and_average():
         average_sales.columns = ['mois', 'ca_moyen']
 
         print("Données de vente mensuelles par représentant :")
-        print(sales_data)
+        print(sales_data.head())
 
         print("Chiffre d'affaires moyen par mois :")
-        print(average_sales)
+        print(average_sales.head())
+
+        # Étape 3 : Création du diagramme avec Seaborn
+        plt.figure(figsize=(12, 6))
+        sns.lineplot(
+            data=sales_data,
+            x="mois",
+            y="chiffre_affaire",
+            hue="nom_representant",
+            marker="o",
+            linewidth=2
+        )
+        sns.lineplot(
+            data=average_sales,
+            x="mois",
+            y="ca_moyen",
+            color="black",
+            linestyle="dashed",
+            label="Moyenne"
+        )
+
+        plt.title("Chiffre d'affaires mensuel par représentant")
+        plt.xlabel("Mois")
+        plt.ylabel("Chiffre d'affaires (€)")
+        plt.xticks(rotation=45)
+        plt.legend(title="Représentant")
+        plt.grid(True)
+        plt.show()
 
         return sales_data, average_sales
 
@@ -653,6 +723,8 @@ def get_monthly_sales_and_average():
     finally:
         engine.dispose()
 
+# Appel de la fonction
+get_monthly_sales_and_average()
 
 # Route pour afficher les ventes mensuelles par pharmacie pour un produit
 @app.route('/product/<code_article>/monthly_sales')
@@ -1218,8 +1290,6 @@ def carte_ventes_agents():
         ).tolist()
 
 
-        # Ajouter ce print ici pour afficher un aperçu des données générées
-        print("Exemple de department_data :", json.dumps(department_data[:2], indent=2))
 
         agent_data = (
             data.explode("nom_agents")
@@ -1248,7 +1318,59 @@ def carte_ventes_agents():
         return f"Erreur lors de la génération de la carte : {e}", 500
 
 
+from datetime import datetime, timedelta
 
+
+@app.route('/backorders')
+def backorders():
+    engine = create_engine(DATABASE_URL)
+    try:
+        # Calcul de la date limite (3 mois avant aujourd'hui)
+        three_months_ago = datetime.today() - timedelta(days=90)
+
+        query = text("""
+            SELECT 
+                p.code_article, 
+                p.nom_produit, 
+                v.num_piece AS bon_de_commande, 
+                c.nom_client AS pharmacie, 
+                v.quantite_vendue AS quantite_commande, 
+                v.date_vente AS date_commande
+            FROM "Ventes" v
+            JOIN produits p ON v.code_article = p.code_article
+            JOIN client c ON v.code_client = c.code_client
+            WHERE v.num_piece LIKE 'CO%' -- Ne garder que les bons de commande
+            AND v.date_vente >= :date_limite -- Filtrer les commandes de moins de 3 mois
+            ORDER BY p.code_article, v.date_vente DESC
+        """)
+
+        with engine.connect() as connection:
+            result = connection.execute(query, {"date_limite": three_months_ago})
+            backorders_data = result.fetchall()
+        
+        # Transformer les résultats en dictionnaire regroupé par code_article
+        backorders_dict = {}
+        for row in backorders_data:
+            code_article = row[0]
+            if code_article not in backorders_dict:
+                backorders_dict[code_article] = {
+                    "nom_produit": row[1],
+                    "quantite_totale": 0,  # Initialisation de la quantité totale
+                    "commandes": []
+                }
+            backorders_dict[code_article]["quantite_totale"] += int(row[4])  # Conversion en entier
+            backorders_dict[code_article]["commandes"].append({
+                "bon_de_commande": row[2],
+                "pharmacie": row[3],
+                "quantite_commande": int(row[4]),  # Conversion en entier
+                "date_commande": row[5]
+            })
+
+        return render_template("backorders.html", backorders=backorders_dict)
+
+    except Exception as e:
+        print(f"Erreur lors de la récupération des backorders : {e}")
+        return f"Erreur lors de la récupération des backorders : {e}", 500
 
 
 

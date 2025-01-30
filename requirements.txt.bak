@@ -13,4 +13,3 @@ psycopg2
 psycopg2-binary
 folium
 geopandas
-python-3.9

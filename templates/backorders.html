@@ -1,0 +1,95 @@
+{% extends "layout.html" %}
+
+{% block content %}
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        .sub-table {
+            margin-top: 5px;
+            width: 95%;
+            margin-left: 20px;
+        }
+        .toggle-btn {
+            cursor: pointer;
+            color: blue;
+            text-decoration: underline;
+        }
+    </style>
+    <script>
+        function toggleDetails(codeArticle) {
+            const detailsRow = document.getElementById(`details-${codeArticle}`);
+            if (detailsRow.style.display === "none") {
+                detailsRow.style.display = "table-row";
+            } else {
+                detailsRow.style.display = "none";
+            }
+        }
+    </script>
+
+    <h2>Produits en Backorder</h2>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Code Article</th>
+                <th>Désignation</th>
+                <th>Quantité Totale</th>
+                <th>Commandes en cours</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for code_article, data in backorders.items() %}
+                <tr>
+                    <td>{{ code_article }}</td>
+                    <td>{{ data.nom_produit }}</td>
+                    <td>{{ data.quantite_totale }}</td>
+                    <td>
+                        <span class="toggle-btn" onclick="toggleDetails('{{ code_article }}')">Afficher les détails</span>
+                    </td>
+                </tr>
+                <tr id="details-{{ code_article }}" style="display: none;">
+                    <td colspan="4">
+                        <table class="sub-table">
+                            <thead>
+                                <tr>
+                                    <th>Bon de Commande</th>
+                                    <th>Pharmacie</th>
+                                    <th>Quantité</th>
+                                    <th>Date de Commande</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for commande in data.commandes %}
+                                <tr>
+                                    <td>{{ commande.bon_de_commande }}</td>
+                                    <td>{{ commande.pharmacie }}</td>
+                                    <td>{{ commande.quantite_commande }}</td>
+                                    <td>{{ commande.date_commande }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+</html>
+{% endblock %}

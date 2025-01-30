@@ -18,14 +18,13 @@
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header bg-primary text-white">
-                    Dernières Activités
+                    Dernières modification
                 </div>
                 <div class="card-body">
                     <p>Récapitulatif des ventes récentes, mises à jour logistiques et autres activités importantes.</p>
                     <ul>
-                        <li>Vente record sur le produit X - Janvier 2025</li>
-                        <li>Mise à jour logistique effectuée pour 5 produits</li>
-                        <li>CA moyen des représentants : 10% de hausse ce mois-ci</li>
+                        <li>Creation d'une carte de la france avec l'implantation des pharmacies partenaires et des agents commerciaux</li>
+                 
                     </ul>
                 </div>
             </div>
