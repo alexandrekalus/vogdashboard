@@ -14,6 +14,7 @@ import folium
 import geopandas as gpd
 import json  # Import du module json
 import seaborn as sns
+from datetime import datetime, timedelta
 
 # Initialisation de l'application Flask
 app = Flask(__name__)
@@ -1320,14 +1321,17 @@ def carte_ventes_agents():
 
 from datetime import datetime, timedelta
 
+
 from datetime import datetime, timedelta
 
 @app.route('/backorders')
 def backorders():
     engine = create_engine(DATABASE_URL)
     try:
-        # Calcul de la date limite (3 mois avant aujourd'hui)
+        # Calcul de la date limite pour filtrer les commandes de plus de 3 mois
         three_months_ago = datetime.today() - timedelta(days=90)
+        # Calcul de la date limite pour l'affichage des commandes de moins de 3 jours
+        three_days_ago = datetime.today() - timedelta(days=3)
 
         query = text("""
             SELECT 
@@ -1360,12 +1364,22 @@ def backorders():
                     "commandes": []
                 }
             backorders_dict[code_article]["quantite_totale"] += int(row[4])  # Conversion en entier
-            backorders_dict[code_article]["commandes"].append({
-                "bon_de_commande": row[2],
-                "pharmacie": row[3],
-                "quantite_commande": int(row[4]),  # Conversion en entier
-                "date_commande": row[5]
-            })
+
+            # Convertir la date en datetime pour assurer une bonne comparaison
+            date_commande = row[5]
+            if isinstance(date_commande, datetime):  # Si c'est déjà un datetime
+                date_obj = date_commande
+            else:  # Si c'est un objet date, on le transforme en datetime
+                date_obj = datetime.combine(date_commande, datetime.min.time())
+
+            # Ne stocker que les commandes de moins de 3 jours pour l'affichage
+            if date_obj >= three_days_ago:
+                backorders_dict[code_article]["commandes"].append({
+                    "bon_de_commande": row[2],
+                    "pharmacie": row[3],
+                    "quantite_commande": int(row[4]),  # Conversion en entier
+                    "date_commande": row[5]
+                })
 
         return render_template("backorders.html", backorders=backorders_dict)
 

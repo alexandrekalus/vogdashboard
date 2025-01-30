@@ -14,6 +14,7 @@ import folium
 import geopandas as gpd
 import json  # Import du module json
 import seaborn as sns
+from datetime import datetime, timedelta
 
 # Initialisation de l'application Flask
 app = Flask(__name__)
@@ -1320,13 +1321,13 @@ def carte_ventes_agents():
 
 from datetime import datetime, timedelta
 
-
 @app.route('/backorders')
 def backorders():
     engine = create_engine(DATABASE_URL)
     try:
-        # Calcul de la date limite (3 mois avant aujourd'hui)
-        three_months_ago = datetime.today() - timedelta(days=90)
+        # Calcul des bornes de date
+        three_months_ago = datetime.today() - timedelta(days=90)  # Limite max : 3 mois
+        three_days_ago = datetime.today() - timedelta(days=3)      # Limite min : 3 jours
 
         query = text("""
             SELECT 
@@ -1340,12 +1341,15 @@ def backorders():
             JOIN produits p ON v.code_article = p.code_article
             JOIN client c ON v.code_client = c.code_client
             WHERE v.num_piece LIKE 'CO%' -- Ne garder que les bons de commande
-            AND v.date_vente >= :date_limite -- Filtrer les commandes de moins de 3 mois
+            AND v.date_vente BETWEEN :date_limite_min AND :date_limite_max -- Filtrer entre 3 jours et 3 mois
             ORDER BY p.code_article, v.date_vente DESC
         """)
 
         with engine.connect() as connection:
-            result = connection.execute(query, {"date_limite": three_months_ago})
+            result = connection.execute(query, {
+                "date_limite_min": three_months_ago,
+                "date_limite_max": three_days_ago
+            })
             backorders_data = result.fetchall()
         
         # Transformer les résultats en dictionnaire regroupé par code_article
@@ -1359,6 +1363,8 @@ def backorders():
                     "commandes": []
                 }
             backorders_dict[code_article]["quantite_totale"] += int(row[4])  # Conversion en entier
+
+            # Ajouter les commandes filtrées à la liste
             backorders_dict[code_article]["commandes"].append({
                 "bon_de_commande": row[2],
                 "pharmacie": row[3],
