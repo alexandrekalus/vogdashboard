@@ -1500,7 +1500,109 @@ def backorders():
 
 
 
-        
+#affichage du palmares des pharmacies
+from datetime import datetime, timedelta
+
+@app.route("/pharmacies")
+def pharmacies():
+    engine = create_engine(DATABASE_URL)
+    
+    try:
+        query = text('''
+        SELECT 
+            c.code_client, 
+            c.nom_client AS pharmacie, 
+            c.representant AS agent_commercial,
+            MAX(v.date_vente) AS derniere_commande,
+            COUNT(v.num_piece) AS nombre_commandes,
+            SUM(SUM(v.quantite_vendue * v.prix_achat)) OVER(PARTITION BY c.code_client) AS ca_total
+        FROM 
+            "Ventes" v
+        JOIN 
+            client c ON v.code_client = c.code_client
+        WHERE 
+            v.num_piece LIKE 'FA%'  -- Uniquement les factures
+        GROUP BY 
+            c.code_client, c.nom_client, c.representant
+        ORDER BY 
+            ca_total DESC;
+        ''')
+
+        # Exécuter la requête avec pandas
+        df = pd.read_sql_query(query, engine)
+
+        if df.empty:
+            return "<h1>Aucune donnée disponible pour les pharmacies.</h1>"
+
+        # Convertir les dates et les valeurs numériques
+        df["derniere_commande"] = pd.to_datetime(df["derniere_commande"])
+        df["ca_total"] = df["ca_total"].fillna(0).astype(int)
+
+        # Structurer les données pour affichage
+        pharmacies_data = df.to_dict(orient="records")
+
+        # Passer `timedelta` et `datetime` au template
+        return render_template("pharmacies.html", pharmacies=pharmacies_data, now=datetime.utcnow(), timedelta=timedelta)
+
+    except Exception as e:
+        print(f"Erreur lors de l'exécution de la requête : {e}")
+        return f"Erreur lors de l'exécution de la requête : {e}", 500
+
+    finally:
+        engine.dispose()
+
+
+
+from datetime import datetime, timedelta
+
+@app.route("/pharmacy_sales/<code_client>")
+def pharmacy_sales(code_client):
+    engine = create_engine(DATABASE_URL)
+    
+    try:
+        query = text('''
+        SELECT 
+            TO_CHAR(v.date_vente, 'YYYY-MM') AS mois_annee,
+            SUM(v.quantite_vendue * v.prix_achat) AS ca_mensuel
+        FROM 
+            "Ventes" v
+        WHERE 
+            v.code_client = :code_client
+            AND v.num_piece LIKE 'FA%'  -- Uniquement les factures
+            AND v.date_vente >= CURRENT_DATE - INTERVAL '24 months'
+        GROUP BY 
+            TO_CHAR(v.date_vente, 'YYYY-MM')
+        ORDER BY 
+            TO_CHAR(v.date_vente, 'YYYY-MM') ASC;
+        ''')
+
+        # Exécuter la requête
+        result = pd.read_sql_query(query, engine, params={"code_client": code_client})
+
+        # Générer une liste des 24 derniers mois
+        today = datetime.today()
+        months = [(today - timedelta(days=30 * i)).strftime("%Y-%m") for i in range(23, -1, -1)]
+
+        # Créer un dictionnaire pour les données
+        sales_data = {row["mois_annee"]: int(row["ca_mensuel"]) for _, row in result.iterrows()}
+
+        # Compléter les mois manquants avec 0
+        labels = []
+        data = []
+        for month in months:
+            labels.append(datetime.strptime(month, "%Y-%m").strftime("%b %Y"))  # Format Mois Année (ex: Jan 2023)
+            data.append(sales_data.get(month, 0))  # Valeur ou 0 si le mois est absent
+
+        return {"labels": labels, "data": data}
+
+    except Exception as e:
+        print(f"Erreur lors de l'exécution de la requête : {e}")
+        return {"error": str(e)}, 500
+
+    finally:
+        engine.dispose()
+
+     
 
 
 @app.route("/import_clients")

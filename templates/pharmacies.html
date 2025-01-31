@@ -1,0 +1,112 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<h1>Liste des Pharmacies par Chiffre d'Affaires</h1>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Pharmacie</th>
+            <th>Agent Commercial</th>
+            <th>Chiffre d'Affaires</th>
+            <th>Dernière Commande</th>
+            <th>Nombre de Commandes</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for pharmacy in pharmacies %}
+        <tr>
+            <td>
+                <a href="#" onclick="openPopup('{{ pharmacy.code_client }}', '{{ pharmacy.pharmacie }}')">
+                    {{ pharmacy.pharmacie }}
+                </a>
+            </td>
+            <td>{{ pharmacy.agent_commercial }}</td>
+            <td>{{ pharmacy.ca_total }} €</td>
+			<td 
+				style="background-color: {% if pharmacy.derniere_commande and pharmacy.derniere_commande < (now - timedelta(days=90)) %}#ffcccc{% endif %};">
+				{% if pharmacy.derniere_commande %}
+					{{ pharmacy.derniere_commande.strftime('%d/%m/%Y') }}
+				{% else %}
+					Aucune commande
+				{% endif %}
+			</td>
+            <td>{{ pharmacy.nombre_commandes }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- Popup Modal -->
+<div id="popup" style="display:none; position:fixed; top:10%; left:10%; width:80%; height:80%; background:white; border:1px solid #ccc; box-shadow:0 4px 8px rgba(0,0,0,0.2); overflow:auto; z-index:1000;">
+    <div style="padding:10px; text-align:right;">
+        <button onclick="closePopup()">Fermer</button>
+    </div>
+    <h2 id="popup-title"></h2>
+    <canvas id="popup-chart"></canvas>
+</div>
+
+<!-- Import Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    let chartInstance = null; // Garde la référence du graphique actuel
+
+function openPopup(codeClient, pharmacie) {
+    // Mettre à jour le titre du popup
+    document.getElementById('popup-title').innerText = `Ventes Mensuelles (24 derniers mois) - ${pharmacie}`;
+
+    // Requête AJAX pour récupérer les données de ventes mensuelles
+    fetch(`/pharmacy_sales/${codeClient}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log("Données reçues du serveur:", data);
+
+            if (data.labels && data.data) {
+                const ctx = document.getElementById('popup-chart').getContext('2d');
+
+                // Détruire l'ancien graphique s'il existe
+                if (chartInstance) {
+                    chartInstance.destroy();
+                }
+
+                // Créer un nouveau graphique
+                chartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            label: "Chiffre d'Affaires (€)",
+                            data: data.data,
+                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } else {
+                console.error("Les données reçues sont incorrectes:", data);
+            }
+        })
+        .catch(error => {
+            console.error("Erreur lors de la récupération des données:", error);
+        });
+
+    // Afficher le popup
+    document.getElementById('popup').style.display = 'block';
+}
+
+function closePopup() {
+    document.getElementById('popup').style.display = 'none';
+}
+
+</script>
+{% endblock %}

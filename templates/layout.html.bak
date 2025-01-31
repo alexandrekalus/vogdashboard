@@ -133,6 +133,12 @@
 						   Carte des representants
 						</a>
 						</li>
+						<li><a class="nav-link" href="/backorders">
+						   gestion des backorders
+						</a>
+						</li>						
+						
+						
                     </ul>
                 </div>
             </nav>
