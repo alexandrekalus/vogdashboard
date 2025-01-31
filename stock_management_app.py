@@ -597,6 +597,7 @@ def import_purchase_data():
         print(traceback.format_exc())  # Affichage complet de l'erreur
         return f"Erreur lors de l'importation : {e}", 500
 
+#affichage de la page palmares 
 #affichage de la page palmares
 @app.route("/sales_palmares")
 def sales_palmares():
@@ -612,9 +613,9 @@ def sales_palmares():
             lp.delai_reapprovisionnement,
             COALESCE(ROUND((SUM(CASE WHEN v.date_vente >= CURRENT_DATE - INTERVAL '30 days' 
                 AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) / 30.0)::numeric, 0), 0) AS ventes_moy_30_jours,
-            SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2023 AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) AS vente_2023,
-            SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2024 AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) AS vente_2024,
-            SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2025 AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) AS vente_2025
+            SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2023 AND v.num_piece LIKE 'FA%' OR v.num_piece LIKE 'CO%' THEN v.quantite_vendue ELSE 0 END) AS vente_2023,
+            SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2024 AND v.num_piece LIKE 'FA%' OR v.num_piece LIKE 'CO%' THEN v.quantite_vendue ELSE 0 END) AS vente_2024,
+            SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2025 AND v.num_piece LIKE 'FA%' OR v.num_piece LIKE 'CO%' THEN v.quantite_vendue ELSE 0 END) AS vente_2025
         FROM 
             produits p
         LEFT JOIN 
@@ -626,7 +627,7 @@ def sales_palmares():
         GROUP BY 
             p.code_article, p.nom_produit, s.quantite_stock, lp.delai_reapprovisionnement
         ORDER BY 
-            vente_2024 DESC;
+            vente_2025 DESC;
         ''')
 
         # Exécuter la requête avec pandas
@@ -674,6 +675,10 @@ def sales_palmares():
     finally:
         # Fermez correctement la connexion à la base de données
         engine.dispose()
+
+
+
+
 
 
 

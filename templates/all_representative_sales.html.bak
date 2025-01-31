@@ -61,7 +61,8 @@
                         beginAtZero: true
                     },
                     y: {
-                        beginAtZero: true
+                        beginAtZero: true,
+						min: 15000, // Forcer un minimum de 15 000
                     }
                 }
             }
@@ -92,40 +93,41 @@
 <script>
     let chartInstance = null;
 
-    function openPopup(agentName) {
-        // Mettre à jour le titre du popup
-        document.getElementById('popup-title').innerText = `Produits les plus vendus par ${agentName}`;
+   function openPopup(agentName) {
+    // Mettre à jour le titre du popup
+    document.getElementById('popup-title').innerText = `Produits les plus vendus par ${agentName}`;
 
-        // Requête AJAX pour récupérer les produits les plus vendus
-        fetch(`/representative_top_products/${agentName}`)
-            .then(response => response.json())
-            .then(data => {
-                console.log("Données reçues :", data);
+    // Requête AJAX pour récupérer les produits les plus vendus
+    fetch(`/representative_top_products/${agentName}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log("Données reçues :", data);
 
-                // Insérer les données dans le tableau du popup
-                const tableBody = document.getElementById('popup-table').querySelector('tbody');
-                tableBody.innerHTML = ''; // Réinitialiser le contenu du tableau
-                data.forEach(product => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${product.code_article}</td>
-                        <td>${product.nom_produit}</td>
-                        <td>${product.quantite_totale}</td>
-                        <td>${product.derniere_commande}</td>
-                    `;
-                    tableBody.appendChild(row);
-                });
-
-                // Afficher le popup
-                document.getElementById('popup').style.display = 'block';
-            })
-            .catch(error => {
-                console.error("Erreur lors de la récupération des données :", error);
+            // Insérer les données dans le tableau du popup
+            const tableBody = document.getElementById('popup-table').querySelector('tbody');
+            tableBody.innerHTML = ''; // Réinitialiser le contenu du tableau
+            data.forEach(product => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${product.code_article}</td>
+                    <td>${product.nom_produit}</td>
+                    <td>${product.quantite_totale}</td>
+                    <td>${product.derniere_commande}</td>
+                `;
+                tableBody.appendChild(row);
             });
-    }
 
-    function closePopup() {
-        document.getElementById('popup').style.display = 'none';
-    }
+            // Afficher le popup
+            document.getElementById('popup').style.display = 'block';
+        })
+        .catch(error => {
+            console.error("Erreur lors de la récupération des données :", error);
+        });
+}
+
+function closePopup() {
+    document.getElementById('popup').style.display = 'none';
+}
+
 </script>
 {% endblock %}
