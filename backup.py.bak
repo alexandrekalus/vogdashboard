@@ -929,28 +929,16 @@ def representative_sales(nom_representant):
     products_data = get_products_by_representative(nom_representant) 
     return render_template('representative_sales.html', tables=products_data.to_dict(orient='records'), nom_representant=nom_representant)
     
-# Route pour afficher les ventes mensuelles par pharmacie pour un produit
+ # Route pour afficher les ventes mensuelles par pharmacie pour un produit
 @app.route('/product/<code_article>/monthly_sales')
 def monthly_sales(code_article):
-    # Obtenir les ventes mensuelles par pharmacie
     monthly_sales_data = get_monthly_sales_by_pharmacy(code_article)
-
-    # Si aucune donnée n'est retournée, afficher un message approprié
-    if monthly_sales_data is None or monthly_sales_data.empty:
-        return f"<h1>Aucune donnée de vente disponible pour le produit : {code_article}</h1>"
-
-    # Rendu de la page HTML avec les données
-    return render_template(
-        'monthly_sales.html',
-        tables=monthly_sales_data.to_dict(orient='records'),
-        code_article=code_article
-    )
-
-
+    return render_template('monthly_sales.html', tables=monthly_sales_data.to_dict(orient='records'), code_article=code_article)
+ 
 # Fonction pour obtenir les ventes mensuelles par pharmacie pour un produit spécifique
+
 def get_monthly_sales_by_pharmacy(code_article):
-    # Créer une connexion avec SQLAlchemy
-    engine = create_engine(DATABASE_URL)
+    conn = get_db_connection()
     query = '''
     SELECT
         c.code_client AS code_client,
@@ -959,9 +947,9 @@ def get_monthly_sales_by_pharmacy(code_article):
         TO_CHAR(v.date_vente, 'YYYY-MM') AS mois,
         SUM(v.quantite_vendue * v.prix_achat) AS chiffre_affaire
     FROM
-        "Ventes" v
+        Ventes v
     JOIN
-        client c ON v.code_client = c.code_client
+        Client c ON v.code_client = c.code_client
     WHERE
         v.code_article = %s
     GROUP BY
@@ -970,13 +958,7 @@ def get_monthly_sales_by_pharmacy(code_article):
         c.nom_client, mois;
     '''
     try:
-        # Exécution de la requête avec Pandas
-        sales_data = pd.read_sql_query(query, engine, params=[code_article])
-
-        # Vérification si les données sont vides
-        if sales_data.empty:
-            print(f"Aucune vente trouvée pour le produit : {code_article}")
-            return None
+        sales_data = pd.read_sql_query(query, conn, params=[code_article])
 
         # Transformation en table pivot
         sales_pivot = sales_data.pivot_table(
@@ -988,17 +970,12 @@ def get_monthly_sales_by_pharmacy(code_article):
 
         print(f"Ventes mensuelles par pharmacie pour le produit {code_article} :")
         print(sales_pivot)
-
         return sales_pivot
-
     except Exception as e:
         print(f"Erreur lors de la récupération des ventes mensuelles par pharmacie : {e}")
         return None
-
     finally:
-        # Libération des ressources
-        engine.dispose()
-
+        conn.close()
 
     
 
@@ -1011,31 +988,31 @@ def monthly_sales_product(code_article):
 # Route pour gérer le moteur de recherche
 @app.route('/search')
 def search():
-    query = request.args.get('q', '').lower()
+    query = request.args.get('q', '').strip().lower()  # Nettoyer et convertir la requête en minuscule
     if not query:
-        return jsonify([])
-
-    conn = get_db_connection()
-    if conn is None:
-        return jsonify({"error": "Impossible de se connecter à la base de données"}), 500
+        return jsonify([])  # Retourne une liste vide si aucun mot-clé n'est fourni
 
     try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT code_article, nom_produit
-            FROM Produits
-            WHERE LOWER(code_article) LIKE %s OR LOWER(nom_produit) LIKE %s
-            LIMIT 10
-        """, (f'%{query}%', f'%{query}%'))
-        results = cursor.fetchall()
-        conn.close()
+        # Connexion à la base de données
+        with engine.connect() as conn:
+            search_query = text("""
+                SELECT code_article, nom_produit
+                FROM produits
+                WHERE LOWER(code_article) LIKE :query OR LOWER(nom_produit) LIKE :query
+                LIMIT 10
+            """)
+            results = conn.execute(search_query, {"query": f"%{query}%"}).fetchall()
 
-        print(f"Requête reçue pour : {query}")
-        return jsonify([{'code_article': row['code_article'], 'nom_produit': row['nom_produit']} for row in results])
+            print(f"Requête reçue pour : {query}")  # Log pour debug
+
+            # Retourner les résultats sous forme de JSON
+            return jsonify([
+                {"code_article": row[0], "nom_produit": row[1]}
+                for row in results
+            ])
     except Exception as e:
         print(f"Erreur lors de l'exécution de la requête de recherche : {e}")
         return jsonify({"error": "Une erreur s'est produite lors de la recherche"}), 500
-
 
 
 

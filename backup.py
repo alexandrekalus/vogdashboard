@@ -988,31 +988,31 @@ def monthly_sales_product(code_article):
 # Route pour gérer le moteur de recherche
 @app.route('/search')
 def search():
-    query = request.args.get('q', '').strip().lower()  # Nettoyer et convertir la requête en minuscule
+    query = request.args.get('q', '').lower()
     if not query:
-        return jsonify([])  # Retourne une liste vide si aucun mot-clé n'est fourni
+        return jsonify([])
+
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Impossible de se connecter à la base de données"}), 500
 
     try:
-        # Connexion à la base de données
-        with engine.connect() as conn:
-            search_query = text("""
-                SELECT code_article, nom_produit
-                FROM produits
-                WHERE LOWER(code_article) LIKE :query OR LOWER(nom_produit) LIKE :query
-                LIMIT 10
-            """)
-            results = conn.execute(search_query, {"query": f"%{query}%"}).fetchall()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT code_article, nom_produit
+            FROM Produits
+            WHERE LOWER(code_article) LIKE %s OR LOWER(nom_produit) LIKE %s
+            LIMIT 10
+        """, (f'%{query}%', f'%{query}%'))
+        results = cursor.fetchall()
+        conn.close()
 
-            print(f"Requête reçue pour : {query}")  # Log pour debug
-
-            # Retourner les résultats sous forme de JSON
-            return jsonify([
-                {"code_article": row[0], "nom_produit": row[1]}
-                for row in results
-            ])
+        print(f"Requête reçue pour : {query}")
+        return jsonify([{'code_article': row['code_article'], 'nom_produit': row['nom_produit']} for row in results])
     except Exception as e:
         print(f"Erreur lors de l'exécution de la requête de recherche : {e}")
         return jsonify({"error": "Une erreur s'est produite lors de la recherche"}), 500
+
 
 
 

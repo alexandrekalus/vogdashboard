@@ -146,18 +146,17 @@
             ">
                 {{ row.alerte }}
             </td>
-            <td class="{% if row.vente_2025 > row.vente_2024 %}green-background{% elif row.vente_2025 < row.vente_2024 %}red-background{% endif %}">
+            <td >
                 {{ row.vente_2025 }}
             </td>
-            <td class="{% if row.vente_2024 > row.vente_2023 %}green-background{% elif row.vente_2024 < row.vente_2023 %}red-background{% endif %}">
+            <td >
                 {{ row.vente_2024 }}
             </td>
             <td>{{ row.vente_2023 }}</td>
             <td>
-                <a href="/product/{{ row['code_article'] }}/monthly_sales">Voir Ventes Mensuelles par pharmacie</a><br>
-                <a href="/product/{{ row['code_article'] }}/monthly_sales_product">Voir Ventes Mensuelles</a><br>
-                <a href="/add_product_form?code_article={{ row.code_article }}">Ajouter Détails</a><br>
-                <a href="/product/{{ row.code_article }}">Voir Ventes Mensuelles par représentant</a>
+                <a href="/product/{{ row['code_article'] }}/monthly_sales">Ventes Mensuelles par pharmacie</a><br>
+                <a href="/product/{{ row['code_article'] }}/monthly_sales_product">Ventes Mensuelles du produit</a><br>
+                <a href="/product/{{ row.code_article }}">Ventes Mensuelles par représentant</a>
             </td>
         </tr>
         {% endfor %}

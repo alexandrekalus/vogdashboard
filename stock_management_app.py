@@ -931,7 +931,8 @@ def get_monthly_sales_by_pharmacy(code_article):
         c.nom_client AS nom_pharmacie,
         c.representant AS nom_representant,
         TO_CHAR(v.date_vente, 'YYYY-MM') AS mois,
-        SUM(v.quantite_vendue * v.prix_achat) AS chiffre_affaire
+        SUM(v.quantite_vendue * v.prix_achat) AS chiffre_affaire, 
+        SUM(v.quantite_vendue) AS quantite_vendue
     FROM
         "Ventes" v
     JOIN
@@ -952,7 +953,7 @@ def get_monthly_sales_by_pharmacy(code_article):
             sales_pivot = sales_data.pivot_table(
                 index=['code_client', 'nom_pharmacie', 'nom_representant'],
                 columns='mois',
-                values='chiffre_affaire',
+                values='quantite_vendue',
                 fill_value=0
             ).reset_index()
         else:

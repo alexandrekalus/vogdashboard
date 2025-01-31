@@ -59,7 +59,7 @@
     <input type="text" id="search" placeholder="Rechercher par code article, EAN ou titre...">
     <div id="search-results"></div>
 	<br>
-	<a href="/representative_sales_chart">Reporting Reprentant mensuel</a>
+	<a href="/all_representative_sales">Reporting Reprentant mensuel</a>
     </div>
 
 <script>
