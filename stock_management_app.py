@@ -726,7 +726,11 @@ def dynamic_representative_sales():
         JOIN
             client c ON v.code_client = c.code_client
         WHERE
-            v.date_vente >= CURRENT_DATE - INTERVAL '12 months' -- Commandes des 12 derniers mois
+            v.code_client IN (
+                SELECT DISTINCT v1.code_client
+                FROM "Ventes" v1
+                WHERE v1.date_vente >= CURRENT_DATE - INTERVAL '4 months' -- Dernière commande il y a plus de 6 mois
+            )
         GROUP BY
             c.representant, TO_CHAR(v.date_vente, 'YYYY-MM')
         ORDER BY
@@ -764,6 +768,7 @@ def dynamic_representative_sales():
 
     finally:
         engine.dispose()
+
 
 
 # Fonction pour obtenir les ventes mensuelles par représentant et le CA moyen

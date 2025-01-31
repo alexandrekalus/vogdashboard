@@ -709,12 +709,13 @@ def search():
         print(f"Erreur lors de l'exécution de la requête de recherche : {e}")
         return jsonify({"error": "Une erreur s'est produite lors de la recherche"}), 500
         
+        
+#affichage de la page representant        
 @app.route('/all_representative_sales')
 def dynamic_representative_sales():
-    # Créer un moteur SQLAlchemy pour la connexion
     engine = create_engine(DATABASE_URL)  # Remplacez par votre `DATABASE_URL`
     try:
-        # Requête SQL pour obtenir les ventes mensuelles par représentant
+        # Requête SQL mise à jour
         query = '''
         SELECT
             c.representant AS nom_representant,
@@ -724,6 +725,12 @@ def dynamic_representative_sales():
             "Ventes" v
         JOIN
             client c ON v.code_client = c.code_client
+        WHERE
+            v.code_client IN (
+                SELECT DISTINCT v1.code_client
+                FROM "Ventes" v1
+                WHERE v1.date_vente <= CURRENT_DATE - INTERVAL '6 months' -- Dernière commande il y a plus de 6 mois
+            )
         GROUP BY
             c.representant, TO_CHAR(v.date_vente, 'YYYY-MM')
         ORDER BY
@@ -760,8 +767,8 @@ def dynamic_representative_sales():
         return f"Erreur lors de l'exécution de la requête : {e}"
 
     finally:
-        # Libération du moteur SQLAlchemy
         engine.dispose()
+
 
 
 # Fonction pour obtenir les ventes mensuelles par représentant et le CA moyen
