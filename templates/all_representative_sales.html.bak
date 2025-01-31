@@ -1,66 +1,131 @@
 {% extends "layout.html" %}
 
 {% block content %}
-    <h1>Chiffre d'affaires par représentant</h1>
-    <table>
-        {% for rep in representative_sales %}
-        <tr>
-            <td><strong>{{ rep['nom_representant'] }}</strong></td>
-            <td>
-                <canvas id="chart-{{ loop.index }}" width="600" height="100"></canvas>
-            </td>
-        </tr>
-        <script>
-            // Données spécifiques à ce représentant
-            const labels_{{ loop.index }} = {{ average_sales.keys()|list|tojson }};
-            const salesData_{{ loop.index }} = {{ rep.values()|list|tojson }};
-            const averageSalesData_{{ loop.index }} = {{ average_sales.values()|list|tojson }};
+<h1>Chiffre d'affaires par représentant</h1>
 
-            // Créer un graphique pour ce représentant
-            const ctx_{{ loop.index }} = document.getElementById('chart-{{ loop.index }}').getContext('2d');
-            new Chart(ctx_{{ loop.index }}, {
-                type: 'bar',
-                data: {
-                    labels: labels_{{ loop.index }}, // Mois
-                    datasets: [
-                        {
-                            label: 'Chiffre d\'affaires',
-                            data: salesData_{{ loop.index }}.slice(1), // Données du représentant
-                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: 'Moyenne des CA',
-                            data: averageSalesData_{{ loop.index }}, // Moyenne
-                            type: 'line',
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            borderWidth: 2,
-                            fill: false
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'top'
-                        },
-                        tooltip: {
-                            enabled: true
-                        }
+<table>
+    {% for rep in representative_sales %}
+    <tr>
+        <td>
+            <!-- Rendre le nom du représentant cliquable -->
+            <a href="#" onclick="openPopup('{{ rep['nom_representant'] }}')">
+                <strong>{{ rep['nom_representant'] }}</strong>
+            </a>
+        </td>
+        <td>
+            <canvas id="chart-{{ loop.index }}" width="600" height="150"></canvas>
+        </td>
+    </tr>
+    <script>
+        // Données spécifiques à ce représentant
+        const labels_{{ loop.index }} = {{ average_sales.keys()|list|tojson }};
+        const salesData_{{ loop.index }} = {{ rep.values()|list|tojson }};
+        const averageSalesData_{{ loop.index }} = {{ average_sales.values()|list|tojson }};
+
+        // Créer un graphique pour ce représentant
+        const ctx_{{ loop.index }} = document.getElementById('chart-{{ loop.index }}').getContext('2d');
+        new Chart(ctx_{{ loop.index }}, {
+            type: 'bar',
+            data: {
+                labels: labels_{{ loop.index }}, // Mois
+                datasets: [
+                    {
+                        label: 'Chiffre d\'affaires',
+                        data: salesData_{{ loop.index }}.slice(1), // Données du représentant
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
                     },
-                    scales: {
-                        x: {
-                            beginAtZero: true
-                        },
-                        y: {
-                            beginAtZero: true
-                        }
+                    {
+                        label: 'Moyenne des CA',
+                        data: averageSalesData_{{ loop.index }}, // Moyenne
+                        type: 'line',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 2,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    },
+                    tooltip: {
+                        enabled: true
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    },
+                    y: {
+                        beginAtZero: true
                     }
                 }
-            });
-        </script>
-        {% endfor %}
+            }
+        });
+    </script>
+    {% endfor %}
+</table>
+
+<!-- Popup Modal -->
+<div id="popup" style="display:none; position:fixed; top:10%; left:10%; width:80%; height:80%; background:white; border:1px solid #ccc; box-shadow:0 4px 8px rgba(0,0,0,0.2); overflow:auto; z-index:1000;">
+    <div style="padding:10px; text-align:right;">
+        <button onclick="closePopup()">Fermer</button>
+    </div>
+    <h2 id="popup-title">Produits les plus vendus</h2>
+    <table class="table table-striped" id="popup-table">
+        <thead>
+            <tr>
+                <th>Code Article</th>
+                <th>Nom Produit</th>
+                <th>Quantité Vendue</th>
+                <th>Date de Dernière Commande</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
     </table>
+</div>
+
+<script>
+    let chartInstance = null;
+
+    function openPopup(agentName) {
+        // Mettre à jour le titre du popup
+        document.getElementById('popup-title').innerText = `Produits les plus vendus par ${agentName}`;
+
+        // Requête AJAX pour récupérer les produits les plus vendus
+        fetch(`/representative_top_products/${agentName}`)
+            .then(response => response.json())
+            .then(data => {
+                console.log("Données reçues :", data);
+
+                // Insérer les données dans le tableau du popup
+                const tableBody = document.getElementById('popup-table').querySelector('tbody');
+                tableBody.innerHTML = ''; // Réinitialiser le contenu du tableau
+                data.forEach(product => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${product.code_article}</td>
+                        <td>${product.nom_produit}</td>
+                        <td>${product.quantite_totale}</td>
+                        <td>${product.derniere_commande}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+
+                // Afficher le popup
+                document.getElementById('popup').style.display = 'block';
+            })
+            .catch(error => {
+                console.error("Erreur lors de la récupération des données :", error);
+            });
+    }
+
+    function closePopup() {
+        document.getElementById('popup').style.display = 'none';
+    }
+</script>
 {% endblock %}

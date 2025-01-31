@@ -709,12 +709,13 @@ def search():
         print(f"Erreur lors de l'exécution de la requête de recherche : {e}")
         return jsonify({"error": "Une erreur s'est produite lors de la recherche"}), 500
         
+        
+#affichage de la page representant        
 @app.route('/all_representative_sales')
 def dynamic_representative_sales():
-    # Créer un moteur SQLAlchemy pour la connexion
     engine = create_engine(DATABASE_URL)  # Remplacez par votre `DATABASE_URL`
     try:
-        # Requête SQL pour obtenir les ventes mensuelles par représentant
+        # Requête SQL mise à jour
         query = '''
         SELECT
             c.representant AS nom_representant,
@@ -724,6 +725,8 @@ def dynamic_representative_sales():
             "Ventes" v
         JOIN
             client c ON v.code_client = c.code_client
+        WHERE
+            v.date_vente >= CURRENT_DATE - INTERVAL '12 months' -- Commandes des 12 derniers mois
         GROUP BY
             c.representant, TO_CHAR(v.date_vente, 'YYYY-MM')
         ORDER BY
@@ -760,7 +763,6 @@ def dynamic_representative_sales():
         return f"Erreur lors de l'exécution de la requête : {e}"
 
     finally:
-        # Libération du moteur SQLAlchemy
         engine.dispose()
 
 
@@ -846,6 +848,51 @@ def get_monthly_sales_and_average():
 
 # Appel de la fonction
 get_monthly_sales_and_average()
+
+
+@app.route("/representative_top_products/<representant>")
+def representative_top_products(representant):
+    engine = create_engine(DATABASE_URL)
+
+    try:
+        # Requête SQL mise à jour pour inclure la table `client` et utiliser le pivot `code_client`
+        query = text('''
+        SELECT
+            p.code_article,
+            p.nom_produit,
+            SUM(v.quantite_vendue) AS quantite_totale,
+            MAX(v.date_vente) AS derniere_commande
+        FROM
+            "Ventes" v
+        JOIN
+            produits p ON v.code_article = p.code_article
+        JOIN
+            client c ON v.code_client = c.code_client
+        WHERE
+            c.representant = :representant
+            AND v.date_vente >= CURRENT_DATE - INTERVAL '24 months'
+        GROUP BY
+            p.code_article, p.nom_produit
+        ORDER BY
+            quantite_totale DESC
+        LIMIT 50;
+        ''')
+
+        # Exécuter la requête avec le représentant passé en paramètre
+        result = pd.read_sql_query(query, engine, params={"representant": representant})
+
+        # Formater la colonne `derniere_commande` au format `jj/mm/aaaa`
+        result["derniere_commande"] = pd.to_datetime(result["derniere_commande"]).dt.strftime('%d/%m/%Y')
+
+        return result.to_dict(orient="records")
+
+    except Exception as e:
+        print(f"Erreur lors de l'exécution de la requête : {e}")
+        return {"error": str(e)}, 500
+
+    finally:
+        engine.dispose()
+
 
 # Route pour afficher les ventes mensuelles par pharmacie pour un produit
 @app.route('/product/<code_article>/monthly_sales')
