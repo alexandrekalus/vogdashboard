@@ -597,7 +597,7 @@ def import_purchase_data():
         print(traceback.format_exc())  # Affichage complet de l'erreur
         return f"Erreur lors de l'importation : {e}", 500
 
-
+#affichage de la page palmares
 @app.route("/sales_palmares")
 def sales_palmares():
     # Utilisation du moteur SQLAlchemy pour la connexion
@@ -611,7 +611,7 @@ def sales_palmares():
             COALESCE(s.quantite_stock, 0) AS quantite_stock,
             lp.delai_reapprovisionnement,
             COALESCE(ROUND((SUM(CASE WHEN v.date_vente >= CURRENT_DATE - INTERVAL '30 days' 
-                AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) / 30.0)::numeric, 2), 0) AS ventes_moy_30_jours,
+                AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) / 30.0)::numeric, 0), 0) AS ventes_moy_30_jours,
             SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2023 AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) AS vente_2023,
             SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2024 AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) AS vente_2024,
             SUM(CASE WHEN EXTRACT(YEAR FROM v.date_vente) = 2025 AND v.num_piece LIKE 'FA%' THEN v.quantite_vendue ELSE 0 END) AS vente_2025
@@ -639,23 +639,27 @@ def sales_palmares():
         # Ajouter la colonne "Alerte" avec les détails des calculs
         def calculate_alert(row):
             # Extraire les valeurs nécessaires
-            delai = row['delai_reapprovisionnement'] if pd.notnull(row['delai_reapprovisionnement']) else 0
-            ventes_moy_30 = row['ventes_moy_30_jours'] if pd.notnull(row['ventes_moy_30_jours']) else 0
-            stock_actuel = row['quantite_stock'] if pd.notnull(row['quantite_stock']) else 0
+            delai = int(row['delai_reapprovisionnement']) if pd.notnull(row['delai_reapprovisionnement']) else 0
+            ventes_moy_30 = int(row['ventes_moy_30_jours']) if pd.notnull(row['ventes_moy_30_jours']) else 0
+            stock_actuel = int(row['quantite_stock']) if pd.notnull(row['quantite_stock']) else 0
 
             # Calculs
             stock_securite = ventes_moy_30 * 5
             seuil_reapprovisionnement = ventes_moy_30 * delai
-            quantite_a_commander = (stock_securite + seuil_reapprovisionnement) - stock_actuel
+            quantite_a_commander = max((stock_securite + seuil_reapprovisionnement) - stock_actuel, 0)
 
             # Vérifier si une commande est nécessaire
             if quantite_a_commander > 0:
-                return f"Recommander: {quantite_a_commander:.2f}"
+                return f"Recommander: {quantite_a_commander}"
             else:
                 return "OK"
 
         # Appliquer la fonction sur chaque ligne
         df['alerte'] = df.apply(calculate_alert, axis=1)
+
+        # Convertir toutes les valeurs numériques en entiers pour l'affichage
+        for col in ['quantite_stock', 'ventes_moy_30_jours', 'vente_2023', 'vente_2024', 'vente_2025']:
+            df[col] = df[col].fillna(0).astype(int)
 
         # Convertir les données en dict pour affichage
         sales_data = df.to_dict(orient="records")
@@ -670,6 +674,7 @@ def sales_palmares():
     finally:
         # Fermez correctement la connexion à la base de données
         engine.dispose()
+
 
 
         
